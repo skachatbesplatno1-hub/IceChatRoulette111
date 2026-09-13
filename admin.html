@@ -1,0 +1,1934 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>IceChat Admin</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+
+            font-family:
+                Arial,
+                Helvetica,
+                sans-serif;
+
+            color: #fff;
+
+            background:
+                radial-gradient(
+                    circle at top,
+                    #203b59 0%,
+                    #0c1724 45%,
+                    #060b12 100%
+                );
+        }
+
+        button,
+        input,
+        textarea,
+        select {
+            font: inherit;
+        }
+
+        .app {
+            width:
+                min(
+                    1200px,
+                    calc(100% - 24px)
+                );
+
+            margin: 0 auto;
+
+            padding:
+                24px 0 40px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .header {
+            display: flex;
+
+            align-items: center;
+            justify-content: space-between;
+
+            gap: 20px;
+
+            margin-bottom: 20px;
+        }
+
+        .title {
+            font-size: 30px;
+            font-weight: 800;
+        }
+
+        .subtitle {
+            margin-top: 5px;
+
+            color: #91abc2;
+
+            font-size: 13px;
+        }
+
+        .login-card,
+        .panel {
+            padding: 20px;
+
+            border-radius: 20px;
+
+            border:
+                1px solid
+                rgba(255,255,255,0.09);
+
+            background:
+                rgba(255,255,255,0.055);
+
+            box-shadow:
+                0 18px 50px
+                rgba(0,0,0,0.25);
+
+            backdrop-filter: blur(18px);
+        }
+
+        .login-card {
+            max-width: 420px;
+
+            margin:
+                80px auto;
+        }
+
+        .login-title {
+            font-size: 22px;
+            font-weight: 800;
+
+            margin-bottom: 8px;
+        }
+
+        .login-description {
+            color: #91abc2;
+
+            font-size: 13px;
+
+            margin-bottom: 16px;
+        }
+
+        .input {
+            width: 100%;
+
+            height: 48px;
+
+            padding:
+                0 14px;
+
+            border-radius: 12px;
+
+            border:
+                1px solid
+                rgba(255,255,255,0.1);
+
+            background:
+                rgba(0,0,0,0.25);
+
+            color: #fff;
+
+            outline: none;
+        }
+
+        .input:focus {
+            border-color:
+                rgba(92,189,255,0.65);
+        }
+
+        .button {
+            min-height: 44px;
+
+            padding:
+                0 16px;
+
+            border-radius: 12px;
+
+            border:
+                1px solid
+                rgba(255,255,255,0.1);
+
+            background:
+                rgba(255,255,255,0.07);
+
+            color: #fff;
+
+            cursor: pointer;
+
+            transition:
+                background 0.15s ease,
+                transform 0.15s ease;
+        }
+
+        .button:hover {
+            background:
+                rgba(255,255,255,0.12);
+        }
+
+        .button:active {
+            transform:
+                scale(0.98);
+        }
+
+        .button.primary {
+            background:
+                rgba(62,169,255,0.22);
+
+            border-color:
+                rgba(92,189,255,0.55);
+        }
+
+        .button.danger {
+            background:
+                rgba(255,70,70,0.16);
+
+            border-color:
+                rgba(255,100,100,0.42);
+        }
+
+        .button.warning {
+            background:
+                rgba(255,180,60,0.14);
+
+            border-color:
+                rgba(255,190,80,0.38);
+        }
+
+        .button.minute {
+            background:
+                rgba(255,155,60,0.18);
+
+            border-color:
+                rgba(255,180,80,0.48);
+        }
+
+        .button.three-days {
+            background:
+                rgba(255,125,75,0.16);
+
+            border-color:
+                rgba(255,145,90,0.4);
+        }
+
+        .button.seven-days {
+            background:
+                rgba(255,95,80,0.17);
+
+            border-color:
+                rgba(255,110,100,0.42);
+        }
+
+        .button.thirty-days {
+            background:
+                rgba(220,65,70,0.2);
+
+            border-color:
+                rgba(245,90,95,0.45);
+        }
+
+        .button.permanent {
+            background:
+                rgba(130,30,45,0.28);
+
+            border-color:
+                rgba(220,70,90,0.5);
+        }
+
+        .button.small {
+            min-height: 38px;
+
+            padding:
+                0 12px;
+
+            font-size: 12px;
+        }
+
+        .login-actions {
+            display: grid;
+
+            gap: 10px;
+
+            margin-top: 12px;
+        }
+
+        .error {
+            margin-top: 10px;
+
+            color: #ff9696;
+
+            font-size: 13px;
+        }
+
+        .admin-content {
+            display: grid;
+
+            gap: 18px;
+        }
+
+        .toolbar {
+            display: flex;
+
+            align-items: center;
+            justify-content: space-between;
+
+            gap: 12px;
+
+            flex-wrap: wrap;
+        }
+
+        .toolbar-left {
+            display: flex;
+
+            align-items: center;
+
+            gap: 10px;
+
+            flex-wrap: wrap;
+        }
+
+        .counter {
+            padding:
+                7px 10px;
+
+            border-radius: 999px;
+
+            background:
+                rgba(255,255,255,0.07);
+
+            color: #cdeaff;
+
+            font-size: 12px;
+        }
+
+        .report-list,
+        .ban-list {
+            display: grid;
+
+            gap: 12px;
+        }
+
+        .report,
+        .ban {
+            padding: 16px;
+
+            border-radius: 16px;
+
+            border:
+                1px solid
+                rgba(255,255,255,0.08);
+
+            background:
+                rgba(2,7,13,0.45);
+        }
+
+        .report-top,
+        .ban-top {
+            display: flex;
+
+            align-items: flex-start;
+
+            justify-content: space-between;
+
+            gap: 12px;
+        }
+
+        .report-reason {
+            font-size: 16px;
+            font-weight: 800;
+        }
+
+        .status-badge {
+            padding:
+                5px 9px;
+
+            border-radius: 999px;
+
+            background:
+                rgba(255,255,255,0.08);
+
+            font-size: 11px;
+
+            white-space: nowrap;
+        }
+
+        .report-meta,
+        .ban-meta {
+            display: grid;
+
+            gap: 5px;
+
+            margin-top: 10px;
+
+            color: #91abc2;
+
+            font-size: 12px;
+        }
+
+        .report-details {
+            margin-top: 12px;
+
+            padding: 12px;
+
+            border-radius: 12px;
+
+            background:
+                rgba(255,255,255,0.05);
+
+            color: #dceafa;
+
+            font-size: 13px;
+
+            white-space: pre-wrap;
+
+            overflow-wrap: anywhere;
+        }
+
+        .evidence {
+            margin-top: 14px;
+
+            padding: 14px;
+
+            border-radius: 14px;
+
+            background:
+                rgba(0,0,0,0.22);
+
+            border:
+                1px solid
+                rgba(255,255,255,0.06);
+        }
+
+        .evidence-title {
+            margin-bottom: 10px;
+
+            font-weight: 800;
+            font-size: 14px;
+        }
+
+        .evidence-image {
+            display: block;
+
+            width: 100%;
+
+            max-height: 520px;
+
+            object-fit: contain;
+
+            border-radius: 10px;
+
+            background:
+                #03070b;
+        }
+
+        .no-image {
+            padding: 20px;
+
+            text-align: center;
+
+            color: #71889f;
+
+            font-size: 13px;
+        }
+
+        .chat-evidence {
+            display: grid;
+
+            gap: 8px;
+
+            max-height: 430px;
+
+            overflow-y: auto;
+        }
+
+        .evidence-message {
+            padding: 9px 11px;
+
+            border-radius: 11px;
+
+            background:
+                rgba(255,255,255,0.06);
+        }
+
+        .evidence-message.mine {
+            border-left:
+                3px solid
+                #4aaeff;
+        }
+
+        .evidence-message.theirs {
+            border-left:
+                3px solid
+                #ff6e6e;
+        }
+
+        .evidence-message-meta {
+            margin-bottom: 4px;
+
+            color: #91abc2;
+
+            font-size: 10px;
+        }
+
+        .evidence-message-text {
+            color: #fff;
+
+            font-size: 13px;
+
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        .report-actions {
+            display: flex;
+
+            flex-wrap: wrap;
+
+            gap: 8px;
+
+            margin-top: 14px;
+        }
+
+        .empty {
+            padding:
+                30px 10px;
+
+            text-align: center;
+
+            color: #71889f;
+
+            font-size: 13px;
+        }
+
+        .logout {
+            min-height: 40px;
+        }
+
+        .section-title {
+            margin-bottom: 14px;
+
+            font-size: 18px;
+            font-weight: 800;
+        }
+
+        .ban-user {
+            font-size: 14px;
+            font-weight: 700;
+
+            word-break: break-all;
+        }
+
+        .ban-reason {
+            margin-top: 5px;
+
+            color: #cdeaff;
+
+            font-size: 13px;
+        }
+
+        .ban-duration {
+            margin-top: 5px;
+
+            color: #fff;
+
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        @media (max-width: 600px) {
+
+            .app {
+                width:
+                    calc(100% - 14px);
+
+                padding-top: 12px;
+            }
+
+            .title {
+                font-size: 24px;
+            }
+
+            .panel,
+            .login-card {
+                padding: 14px;
+
+                border-radius: 16px;
+            }
+
+            .login-card {
+                margin:
+                    40px auto;
+            }
+
+            .report-top,
+            .ban-top {
+                flex-direction: column;
+            }
+
+            .report-actions {
+                display: grid;
+
+                grid-template-columns:
+                    1fr 1fr;
+            }
+
+            .report-actions
+            .button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="app">
+
+    <section
+        id="loginScreen"
+        class="login-card">
+
+        <div class="login-title">
+            IceChat Admin
+        </div>
+
+        <div class="login-description">
+            Панель модерации доступна только владельцу сайта.
+        </div>
+
+        <input
+            id="passwordInput"
+            class="input"
+            type="password"
+            autocomplete="current-password"
+            placeholder="Пароль администратора"
+        >
+
+        <div class="login-actions">
+
+            <button
+                id="loginButton"
+                class="button primary"
+                type="button">
+                Войти
+            </button>
+
+        </div>
+
+        <div
+            id="loginError"
+            class="error hidden">
+        </div>
+
+    </section>
+
+    <section
+        id="adminScreen"
+        class="hidden">
+
+        <div class="header">
+
+            <div>
+
+                <div class="title">
+                    IceChat Admin
+                </div>
+
+                <div class="subtitle">
+                    Модерация жалоб и блокировок
+                </div>
+
+            </div>
+
+            <button
+                id="logoutButton"
+                class="button logout"
+                type="button">
+                Выйти
+            </button>
+
+        </div>
+
+        <div class="admin-content">
+
+            <section class="panel">
+
+                <div class="toolbar">
+
+                    <div class="toolbar-left">
+
+                        <div class="section-title">
+                            Жалобы
+                        </div>
+
+                        <div
+                            id="reportCounter"
+                            class="counter">
+                            0
+                        </div>
+
+                    </div>
+
+                    <button
+                        id="refreshReports"
+                        class="button small"
+                        type="button">
+                        Обновить
+                    </button>
+
+                </div>
+
+                <div
+                    id="reportList"
+                    class="report-list">
+                </div>
+
+            </section>
+
+            <section class="panel">
+
+                <div class="toolbar">
+
+                    <div class="toolbar-left">
+
+                        <div class="section-title">
+                            Заблокированные
+                        </div>
+
+                        <div
+                            id="banCounter"
+                            class="counter">
+                            0
+                        </div>
+
+                    </div>
+
+                    <button
+                        id="refreshBans"
+                        class="button small"
+                        type="button">
+                        Обновить
+                    </button>
+
+                </div>
+
+                <div
+                    id="banList"
+                    class="ban-list">
+                </div>
+
+            </section>
+
+        </div>
+
+    </section>
+
+</div>
+
+<script>
+document.addEventListener(
+    "DOMContentLoaded",
+    function () {
+
+        var loginScreen =
+            document.getElementById(
+                "loginScreen"
+            );
+
+        var adminScreen =
+            document.getElementById(
+                "adminScreen"
+            );
+
+        var passwordInput =
+            document.getElementById(
+                "passwordInput"
+            );
+
+        var loginButton =
+            document.getElementById(
+                "loginButton"
+            );
+
+        var loginError =
+            document.getElementById(
+                "loginError"
+            );
+
+        var logoutButton =
+            document.getElementById(
+                "logoutButton"
+            );
+
+        var reportList =
+            document.getElementById(
+                "reportList"
+            );
+
+        var banList =
+            document.getElementById(
+                "banList"
+            );
+
+        var reportCounter =
+            document.getElementById(
+                "reportCounter"
+            );
+
+        var banCounter =
+            document.getElementById(
+                "banCounter"
+            );
+
+        var refreshReports =
+            document.getElementById(
+                "refreshReports"
+            );
+
+        var refreshBans =
+            document.getElementById(
+                "refreshBans"
+            );
+
+        function escapeHtml(
+            value
+        ) {
+
+            return String(
+                value || ""
+            )
+                .replace(
+                    /&/g,
+                    "&amp;"
+                )
+                .replace(
+                    /</g,
+                    "&lt;"
+                )
+                .replace(
+                    />/g,
+                    "&gt;"
+                )
+                .replace(
+                    /"/g,
+                    "&quot;"
+                )
+                .replace(
+                    /'/g,
+                    "&#039;"
+                );
+        }
+
+        function formatDate(
+            value
+        ) {
+
+            if (!value) {
+                return "—";
+            }
+
+            var date =
+                new Date(value);
+
+            if (
+                Number.isNaN(
+                    date.getTime()
+                )
+            ) {
+                return value;
+            }
+
+            return date.toLocaleString(
+                "ru-RU"
+            );
+        }
+
+        function formatBanDuration(
+            ban
+        ) {
+
+            if (
+                !ban ||
+                !ban.expiresAt
+            ) {
+                return "Навсегда";
+            }
+
+            return (
+                "До: " +
+                formatDate(
+                    ban.expiresAt
+                )
+            );
+        }
+
+        function showAdmin() {
+
+            loginScreen.classList.add(
+                "hidden"
+            );
+
+            adminScreen.classList.remove(
+                "hidden"
+            );
+
+            loadAll();
+        }
+
+        function showLogin() {
+
+            adminScreen.classList.add(
+                "hidden"
+            );
+
+            loginScreen.classList.remove(
+                "hidden"
+            );
+        }
+
+        async function checkSession() {
+
+            try {
+
+                var response =
+                    await fetch(
+                        "/api/admin/me"
+                    );
+
+                if (
+                    response.ok
+                ) {
+
+                    showAdmin();
+                }
+
+            } catch (error) {
+
+                console.error(
+                    error
+                );
+            }
+        }
+
+        async function login() {
+
+            var password =
+                passwordInput.value;
+
+            if (!password) {
+                return;
+            }
+
+            loginButton.disabled =
+                true;
+
+            loginError.classList.add(
+                "hidden"
+            );
+
+            try {
+
+                var response =
+                    await fetch(
+                        "/api/admin/login",
+                        {
+                            method:
+                                "POST",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+
+                            body:
+                                JSON.stringify({
+                                    password:
+                                        password
+                                })
+                        }
+                    );
+
+                var data =
+                    await response.json();
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        data.error ||
+                        "Ошибка входа"
+                    );
+                }
+
+                passwordInput.value =
+                    "";
+
+                showAdmin();
+
+            } catch (error) {
+
+                loginError.textContent =
+                    error.message;
+
+                loginError.classList.remove(
+                    "hidden"
+                );
+
+            } finally {
+
+                loginButton.disabled =
+                    false;
+            }
+        }
+
+        async function logout() {
+
+            try {
+
+                await fetch(
+                    "/api/admin/logout",
+                    {
+                        method:
+                            "POST"
+                    }
+                );
+
+            } catch (error) {}
+
+            showLogin();
+        }
+
+        async function loadReports() {
+
+            reportList.innerHTML =
+                '<div class="empty">Загрузка...</div>';
+
+            try {
+
+                var response =
+                    await fetch(
+                        "/api/admin/reports"
+                    );
+
+                if (
+                    response.status ===
+                    401
+                ) {
+
+                    showLogin();
+
+                    return;
+                }
+
+                var data =
+                    await response.json();
+
+                renderReports(
+                    data.reports || []
+                );
+
+            } catch (error) {
+
+                console.error(
+                    error
+                );
+
+                reportList.innerHTML =
+                    '<div class="empty">Ошибка загрузки жалоб</div>';
+            }
+        }
+
+        function renderChatHistory(
+            history
+        ) {
+
+            if (
+                !Array.isArray(
+                    history
+                ) ||
+                !history.length
+            ) {
+
+                return `
+                    <div class="no-image">
+                        Текстового чата в этой жалобе нет.
+                    </div>
+                `;
+            }
+
+            return history
+                .map(
+                    function (
+                        item
+                    ) {
+
+                        var mine =
+                            item.side ===
+                            "Вы";
+
+                        return `
+                            <div class="
+                                evidence-message
+                                ${mine ? "mine" : "theirs"}
+                            ">
+
+                                <div
+                                    class="evidence-message-meta">
+
+                                    ${escapeHtml(
+                                        item.side ||
+                                        "Неизвестно"
+                                    )}
+
+                                    ·
+
+                                    ${escapeHtml(
+                                        formatDate(
+                                            item.timestamp
+                                        )
+                                    )}
+
+                                </div>
+
+                                <div
+                                    class="evidence-message-text">
+
+                                    ${escapeHtml(
+                                        item.text
+                                    )}
+
+                                </div>
+
+                            </div>
+                        `;
+                    }
+                )
+                .join("");
+        }
+
+        function renderReports(
+            reports
+        ) {
+
+            reportCounter.textContent =
+                reports.length;
+
+            if (!reports.length) {
+
+                reportList.innerHTML =
+                    '<div class="empty">Жалоб пока нет</div>';
+
+                return;
+            }
+
+            reportList.innerHTML =
+                reports
+                    .map(
+                        function (
+                            report
+                        ) {
+
+                            var statusText =
+                                report.status ===
+                                "new"
+                                    ? "Новая"
+                                    : report.status ===
+                                      "rejected"
+                                        ? "Отклонена"
+                                        : report.status ===
+                                          "warning"
+                                            ? "Предупреждение"
+                                            : report.status ===
+                                              "banned"
+                                                ? "Пользователь заблокирован"
+                                                : report.status;
+
+                            var actions =
+                                "";
+
+                            if (
+                                report.status ===
+                                "new"
+                            ) {
+
+                                if (
+                                    report.targetUserId
+                                ) {
+
+                                    actions =
+                                        `
+                                        <button
+                                            class="button small"
+                                            data-action="reject"
+                                            data-id="${escapeHtml(
+                                                report.id
+                                            )}">
+                                            Отклонить
+                                        </button>
+
+                                        <button
+                                            class="button warning small"
+                                            data-action="warn"
+                                            data-id="${escapeHtml(
+                                                report.id
+                                            )}">
+                                            Предупредить
+                                        </button>
+
+                                        <button
+                                            class="button minute small"
+                                            data-action="ban-minute"
+                                            data-id="${escapeHtml(
+                                                report.id
+                                            )}">
+                                            Бан на 1 минуту
+                                        </button>
+
+                                        <button
+                                            class="button danger small"
+                                            data-action="ban-1day"
+                                            data-id="${escapeHtml(
+                                                report.id
+                                            )}">
+                                            Бан на 1 день
+                                        </button>
+
+                                        <button
+                                            class="button three-days small"
+                                            data-action="ban-3days"
+                                            data-id="${escapeHtml(
+                                                report.id
+                                            )}">
+                                            Бан на 3 дня
+                                        </button>
+
+                                        <button
+                                            class="button seven-days small"
+                                            data-action="ban-7days"
+                                            data-id="${escapeHtml(
+                                                report.id
+                                            )}">
+                                            Бан на 7 дней
+                                        </button>
+
+                                        <button
+                                            class="button thirty-days small"
+                                            data-action="ban-30days"
+                                            data-id="${escapeHtml(
+                                                report.id
+                                            )}">
+                                            Бан на 30 дней
+                                        </button>
+
+                                        <button
+                                            class="button permanent small"
+                                            data-action="ban-permanent"
+                                            data-id="${escapeHtml(
+                                                report.id
+                                            )}">
+                                            Бан навсегда
+                                        </button>
+                                        `;
+
+                                } else {
+
+                                    actions =
+                                        `
+                                        <div class="no-image">
+                                            Это старая жалоба без ID нарушителя.
+                                            Для неё автоматическое определение пользователя невозможно.
+                                        </div>
+
+                                        <button
+                                            class="button small"
+                                            data-action="reject"
+                                            data-id="${escapeHtml(
+                                                report.id
+                                            )}">
+                                            Отклонить
+                                        </button>
+                                        `;
+                                }
+                            }
+
+                            var evidenceImage =
+                                report.evidenceImage
+                                    ? `
+                                        <img
+                                            class="evidence-image"
+                                            src="${escapeHtml(
+                                                report.evidenceImage
+                                            )}"
+                                            alt="Доказательство"
+                                        >
+                                      `
+                                    : `
+                                        <div class="no-image">
+                                            Кадр видео не сохранён.
+                                        </div>
+                                      `;
+
+                            return `
+                                <article class="report">
+
+                                    <div class="report-top">
+
+                                        <div
+                                            class="report-reason">
+
+                                            🚩
+                                            ${escapeHtml(
+                                                report.reason
+                                            )}
+
+                                        </div>
+
+                                        <div
+                                            class="status-badge">
+
+                                            ${escapeHtml(
+                                                statusText
+                                            )}
+
+                                        </div>
+
+                                    </div>
+
+                                    <div class="report-meta">
+
+                                        <div>
+                                            <b>ID жалобы:</b>
+                                            ${escapeHtml(
+                                                report.id
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <b>Жалующийся:</b>
+                                            ${escapeHtml(
+                                                report.reporterId
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <b>Нарушитель:</b>
+                                            ${escapeHtml(
+                                                report.targetUserId ||
+                                                "не определён"
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <b>Комната:</b>
+                                            ${escapeHtml(
+                                                report.roomName
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <b>Дата:</b>
+                                            ${escapeHtml(
+                                                formatDate(
+                                                    report.createdAt
+                                                )
+                                            )}
+                                        </div>
+
+                                        ${
+                                            report.evidenceCapturedAt
+                                                ? `
+                                                    <div>
+                                                        <b>Кадр сохранён:</b>
+                                                        ${escapeHtml(
+                                                            formatDate(
+                                                                report.evidenceCapturedAt
+                                                            )
+                                                        )}
+                                                    </div>
+                                                `
+                                                : ""
+                                        }
+
+                                    </div>
+
+                                    <div
+                                        class="report-details">
+
+                                        <b>Комментарий пользователя:</b>
+
+                                        <br>
+
+                                        ${
+                                            report.details
+                                                ? escapeHtml(
+                                                    report.details
+                                                )
+                                                : "Без дополнительного комментария."
+                                        }
+
+                                    </div>
+
+                                    <div class="evidence">
+
+                                        <div
+                                            class="evidence-title">
+
+                                            📸 Кадр видео собеседника
+
+                                        </div>
+
+                                        ${evidenceImage}
+
+                                    </div>
+
+                                    <div class="evidence">
+
+                                        <div
+                                            class="evidence-title">
+
+                                            💬 Полный чат этой сессии
+
+                                        </div>
+
+                                        <div
+                                            class="chat-evidence">
+
+                                            ${renderChatHistory(
+                                                report.chatHistory
+                                            )}
+
+                                        </div>
+
+                                    </div>
+
+                                    ${
+                                        report.adminNote
+                                            ? `
+                                                <div class="report-details">
+
+                                                    <b>
+                                                        Решение администратора:
+                                                    </b>
+
+                                                    <br>
+
+                                                    ${escapeHtml(
+                                                        report.adminNote
+                                                    )}
+
+                                                </div>
+                                            `
+                                            : ""
+                                    }
+
+                                    ${
+                                        actions
+                                            ? `
+                                                <div
+                                                    class="report-actions">
+
+                                                    ${actions}
+
+                                                </div>
+                                            `
+                                            : ""
+                                    }
+
+                                </article>
+                            `;
+                        }
+                    )
+                    .join("");
+        }
+
+        async function loadBans() {
+
+            banList.innerHTML =
+                '<div class="empty">Загрузка...</div>';
+
+            try {
+
+                var response =
+                    await fetch(
+                        "/api/admin/bans"
+                    );
+
+                if (
+                    response.status ===
+                    401
+                ) {
+
+                    showLogin();
+
+                    return;
+                }
+
+                var data =
+                    await response.json();
+
+                renderBans(
+                    data.bans || []
+                );
+
+            } catch (error) {
+
+                console.error(
+                    error
+                );
+
+                banList.innerHTML =
+                    '<div class="empty">Ошибка загрузки банов</div>';
+            }
+        }
+
+        function renderBans(
+            bans
+        ) {
+
+            banCounter.textContent =
+                bans.length;
+
+            if (!bans.length) {
+
+                banList.innerHTML =
+                    '<div class="empty">Заблокированных пользователей нет</div>';
+
+                return;
+            }
+
+            banList.innerHTML =
+                bans
+                    .map(
+                        function (
+                            ban
+                        ) {
+
+                            var expires =
+                                formatBanDuration(
+                                    ban
+                                );
+
+                            return `
+                                <article class="ban">
+
+                                    <div class="ban-top">
+
+                                        <div>
+
+                                            <div
+                                                class="ban-user">
+
+                                                ${escapeHtml(
+                                                    ban.userId
+                                                )}
+
+                                            </div>
+
+                                            <div
+                                                class="ban-reason">
+
+                                                ${escapeHtml(
+                                                    ban.reason
+                                                )}
+
+                                            </div>
+
+                                            <div
+                                                class="ban-duration">
+
+                                                ${escapeHtml(
+                                                    expires
+                                                )}
+
+                                            </div>
+
+                                        </div>
+
+                                        <button
+                                            class="button small"
+                                            data-unban="${escapeHtml(
+                                                ban.userId
+                                            )}">
+                                            Разбанить
+                                        </button>
+
+                                    </div>
+
+                                    <div class="ban-meta">
+
+                                        <div>
+                                            Создан:
+                                            ${escapeHtml(
+                                                formatDate(
+                                                    ban.createdAt
+                                                )
+                                            )}
+                                        </div>
+
+                                        ${
+                                            ban.adminNote
+                                                ? `
+                                                    <div>
+                                                        Комментарий:
+                                                        ${escapeHtml(
+                                                            ban.adminNote
+                                                        )}
+                                                    </div>
+                                                `
+                                                : ""
+                                        }
+
+                                    </div>
+
+                                </article>
+                            `;
+                        }
+                    )
+                    .join("");
+        }
+
+        async function processReport(
+            reportId,
+            action
+        ) {
+
+            var note =
+                "";
+
+            if (
+                action ===
+                    "warn" ||
+                action ===
+                    "ban-minute" ||
+                action ===
+                    "ban-1day" ||
+                action ===
+                    "ban-3days" ||
+                action ===
+                    "ban-7days" ||
+                action ===
+                    "ban-30days" ||
+                action ===
+                    "ban-permanent"
+            ) {
+
+                note =
+                    window.prompt(
+                        "Комментарий администратора (необязательно):",
+                        ""
+                    );
+
+                if (
+                    note ===
+                    null
+                ) {
+                    return;
+                }
+            }
+
+            var serverAction =
+                action ===
+                    "reject"
+                    ? "reject"
+                    : action ===
+                      "warn"
+                        ? "warn"
+                        : "ban";
+
+            var duration =
+                null;
+
+            if (
+                action ===
+                "ban-minute"
+            ) {
+
+                duration =
+                    "minute";
+            }
+
+            if (
+                action ===
+                "ban-1day"
+            ) {
+
+                duration =
+                    "1day";
+            }
+
+            if (
+                action ===
+                "ban-3days"
+            ) {
+
+                duration =
+                    "3days";
+            }
+
+            if (
+                action ===
+                "ban-7days"
+            ) {
+
+                duration =
+                    "7days";
+            }
+
+            if (
+                action ===
+                "ban-30days"
+            ) {
+
+                duration =
+                    "30days";
+            }
+
+            if (
+                action ===
+                "ban-permanent"
+            ) {
+
+                duration =
+                    "permanent";
+            }
+
+            try {
+
+                var response =
+                    await fetch(
+                        "/api/admin/reports/" +
+                        encodeURIComponent(
+                            reportId
+                        ) +
+                        "/action",
+                        {
+                            method:
+                                "POST",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+
+                            body:
+                                JSON.stringify({
+                                    action:
+                                        serverAction,
+
+                                    note:
+                                        note ||
+                                        "",
+
+                                    duration:
+                                        duration
+                                })
+                        }
+                    );
+
+                if (
+                    response.status ===
+                    401
+                ) {
+
+                    showLogin();
+
+                    return;
+                }
+
+                var data =
+                    await response.json();
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        data.error ||
+                        "Ошибка"
+                    );
+                }
+
+                await loadAll();
+
+            } catch (error) {
+
+                alert(
+                    error.message
+                );
+            }
+        }
+
+        async function unban(
+            userId
+        ) {
+
+            var confirmed =
+                window.confirm(
+                    "Разбанить этого пользователя?"
+                );
+
+            if (!confirmed) {
+                return;
+            }
+
+            try {
+
+                var response =
+                    await fetch(
+                        "/api/admin/bans/" +
+                        encodeURIComponent(
+                            userId
+                        ) +
+                        "/unban",
+                        {
+                            method:
+                                "POST"
+                        }
+                    );
+
+                if (
+                    response.status ===
+                    401
+                ) {
+
+                    showLogin();
+
+                    return;
+                }
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        "Не удалось разбанить"
+                    );
+                }
+
+                await loadBans();
+
+            } catch (error) {
+
+                alert(
+                    error.message
+                );
+            }
+        }
+
+        async function loadAll() {
+
+            await Promise.all([
+                loadReports(),
+                loadBans()
+            ]);
+        }
+
+        loginButton.addEventListener(
+            "click",
+            login
+        );
+
+        passwordInput.addEventListener(
+            "keydown",
+            function (
+                event
+            ) {
+
+                if (
+                    event.key ===
+                    "Enter"
+                ) {
+
+                    login();
+                }
+            }
+        );
+
+        logoutButton.addEventListener(
+            "click",
+            logout
+        );
+
+        refreshReports.addEventListener(
+            "click",
+            loadReports
+        );
+
+        refreshBans.addEventListener(
+            "click",
+            loadBans
+        );
+
+        reportList.addEventListener(
+            "click",
+            function (
+                event
+            ) {
+
+                var button =
+                    event.target.closest(
+                        "button[data-action]"
+                    );
+
+                if (!button) {
+                    return;
+                }
+
+                var action =
+                    button.getAttribute(
+                        "data-action"
+                    );
+
+                var reportId =
+                    button.getAttribute(
+                        "data-id"
+                    );
+
+                processReport(
+                    reportId,
+                    action
+                );
+            }
+        );
+
+        banList.addEventListener(
+            "click",
+            function (
+                event
+            ) {
+
+                var button =
+                    event.target.closest(
+                        "button[data-unban]"
+                    );
+
+                if (!button) {
+                    return;
+                }
+
+                unban(
+                    button.getAttribute(
+                        "data-unban"
+                    )
+                );
+            }
+        );
+
+        checkSession();
+    }
+);
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1052 @@
+/* =========================================================
+   ICECHAT — GLASS / ICE UI
+   Полностью новый стиль
+   ========================================================= */
+
+:root {
+    --bg-main: #050912;
+    --bg-secondary: #08111f;
+
+    --ice-white: rgba(235, 249, 255, 0.92);
+    --ice-soft: rgba(210, 237, 255, 0.72);
+
+    --glass: rgba(180, 220, 255, 0.075);
+    --glass-hover: rgba(200, 235, 255, 0.13);
+    --glass-strong: rgba(190, 225, 255, 0.16);
+
+    --border: rgba(220, 245, 255, 0.16);
+    --border-bright: rgba(220, 248, 255, 0.32);
+
+    --blue: #8ed8ff;
+    --blue-bright: #c4efff;
+
+    --green: #8ff5c0;
+    --red: #ff8295;
+
+    --radius: 18px;
+    --radius-small: 13px;
+
+    --blur: blur(22px);
+}
+
+/* =========================================================
+   RESET
+   ========================================================= */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html,
+body {
+    width: 100%;
+    min-height: 100%;
+}
+
+body {
+    font-family:
+        Inter,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Arial,
+        sans-serif;
+
+    color: var(--ice-white);
+
+    background:
+        radial-gradient(
+            circle at 15% 15%,
+            rgba(75, 170, 255, 0.12),
+            transparent 32%
+        ),
+        radial-gradient(
+            circle at 85% 20%,
+            rgba(100, 210, 255, 0.08),
+            transparent 28%
+        ),
+        radial-gradient(
+            circle at 50% 100%,
+            rgba(40, 100, 180, 0.13),
+            transparent 40%
+        ),
+        linear-gradient(
+            145deg,
+            #03060d 0%,
+            #07101c 45%,
+            #040912 100%
+        );
+
+    overflow-x: hidden;
+}
+
+/* =========================================================
+   ICE LIGHT EFFECT
+   ========================================================= */
+
+body::before {
+    content: "";
+
+    position: fixed;
+    inset: -30%;
+
+    pointer-events: none;
+
+    background:
+        radial-gradient(
+            circle at 30% 30%,
+            rgba(130, 220, 255, 0.045),
+            transparent 25%
+        ),
+        radial-gradient(
+            circle at 75% 65%,
+            rgba(80, 160, 255, 0.04),
+            transparent 25%
+        );
+
+    filter: blur(50px);
+
+    animation: iceGlow 12s ease-in-out infinite alternate;
+
+    z-index: -1;
+}
+
+@keyframes iceGlow {
+    from {
+        transform: translate(-2%, -1%) scale(1);
+    }
+
+    to {
+        transform: translate(2%, 1%) scale(1.06);
+    }
+}
+
+/* =========================================================
+   MAIN APP
+   ========================================================= */
+
+.app {
+    width: 100%;
+    min-height: 100vh;
+
+    padding: 22px;
+
+    position: relative;
+}
+
+/* =========================================================
+   HEADER
+   ========================================================= */
+
+.header {
+    width: 100%;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    margin-bottom: 22px;
+}
+
+.logo {
+    font-size: 27px;
+    font-weight: 800;
+    letter-spacing: -0.8px;
+
+    color: #eafaff;
+
+    text-shadow:
+        0 0 12px rgba(140, 220, 255, 0.25),
+        0 0 30px rgba(80, 170, 255, 0.12);
+}
+
+#status {
+    padding: 9px 15px;
+
+    border-radius: 999px;
+
+    background: rgba(180, 220, 255, 0.065);
+
+    border: 1px solid rgba(220, 245, 255, 0.14);
+
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+
+    color: rgba(225, 245, 255, 0.72);
+
+    font-size: 13px;
+}
+
+/* =========================================================
+   SETUP
+   ========================================================= */
+
+.setup {
+    width: min(700px, 100%);
+
+    margin: 0 auto 20px;
+
+    padding: 22px;
+
+    border-radius: var(--radius);
+
+    background:
+        linear-gradient(
+            135deg,
+            rgba(200, 235, 255, 0.09),
+            rgba(120, 180, 230, 0.035)
+        );
+
+    border: 1px solid var(--border);
+
+    backdrop-filter: var(--blur);
+    -webkit-backdrop-filter: var(--blur);
+
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 15px 45px rgba(0, 0, 0, 0.25);
+}
+
+.setup-title {
+    margin-bottom: 14px;
+
+    color: rgba(230, 248, 255, 0.9);
+
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.gender-buttons {
+    display: flex;
+    gap: 10px;
+
+    flex-wrap: wrap;
+}
+
+/* =========================================================
+   GLASS BUTTONS
+   ========================================================= */
+
+button {
+    font-family: inherit;
+}
+
+.gender-button,
+button {
+    position: relative;
+
+    border: 1px solid rgba(220, 245, 255, 0.15);
+
+    background:
+        linear-gradient(
+            135deg,
+            rgba(205, 237, 255, 0.095),
+            rgba(130, 190, 230, 0.045)
+        );
+
+    color: rgba(230, 248, 255, 0.86);
+
+    backdrop-filter: blur(18px) saturate(130%);
+    -webkit-backdrop-filter: blur(18px) saturate(130%);
+
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.075),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.12),
+        0 8px 24px rgba(0, 0, 0, 0.16);
+
+    transition:
+        background 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        transform 0.2s ease,
+        color 0.2s ease;
+
+    cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+    background:
+        linear-gradient(
+            135deg,
+            rgba(220, 244, 255, 0.16),
+            rgba(145, 205, 245, 0.075)
+        );
+
+    border-color: rgba(220, 248, 255, 0.31);
+
+    color: #f1fbff;
+
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 10px 30px rgba(70, 170, 240, 0.12);
+
+    transform: translateY(-1px);
+}
+
+button:active:not(:disabled) {
+    transform: translateY(0);
+
+    background:
+        rgba(200, 235, 255, 0.13);
+}
+
+button:disabled {
+    opacity: 0.35;
+
+    cursor: not-allowed;
+
+    box-shadow: none;
+}
+
+/* =========================================================
+   GENDER BUTTONS
+   ========================================================= */
+
+.gender-button {
+    flex: 1;
+
+    min-width: 145px;
+
+    padding: 13px 17px;
+
+    border-radius: 14px;
+
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.gender-button.active,
+.gender-button.selected {
+    background:
+        linear-gradient(
+            135deg,
+            rgba(170, 225, 255, 0.21),
+            rgba(95, 180, 245, 0.09)
+        );
+
+    border-color: rgba(185, 235, 255, 0.42);
+
+    color: #e9faff;
+
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.14),
+        0 0 22px rgba(100, 195, 255, 0.12);
+}
+
+/* =========================================================
+   CONTENT
+   ========================================================= */
+
+.content-area {
+    width: 100%;
+
+    display: flex;
+
+    gap: 18px;
+
+    align-items: stretch;
+}
+
+/* =========================================================
+   VIDEO AREA
+   ========================================================= */
+
+.videos {
+    flex: 1;
+
+    min-width: 0;
+
+    display: grid;
+
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    gap: 18px;
+}
+
+/* =========================================================
+   VIDEO CARDS
+   ========================================================= */
+
+.video-card {
+    position: relative;
+
+    min-height: 440px;
+
+    overflow: hidden;
+
+    border-radius: 20px;
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(150, 205, 240, 0.075),
+            rgba(10, 20, 35, 0.46)
+        );
+
+    border: 1px solid rgba(220, 245, 255, 0.14);
+
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.055),
+        0 20px 55px rgba(0, 0, 0, 0.32);
+}
+
+.video-card::before {
+    content: "";
+
+    position: absolute;
+
+    top: 0;
+    left: 12%;
+    right: 12%;
+
+    height: 1px;
+
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(220, 248, 255, 0.3),
+        transparent
+    );
+
+    z-index: 3;
+
+    pointer-events: none;
+}
+
+.video-card video {
+    width: 100%;
+    height: 100%;
+
+    min-height: 440px;
+
+    display: block;
+
+    object-fit: cover;
+
+    background:
+        radial-gradient(
+            circle,
+            rgba(70, 130, 180, 0.08),
+            transparent 60%
+        ),
+        #03070e;
+}
+
+/* =========================================================
+   VIDEO PLACEHOLDER
+   ========================================================= */
+
+.video-placeholder {
+    position: absolute;
+
+    inset: 0;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    flex-direction: column;
+
+    gap: 9px;
+
+    color: rgba(215, 240, 255, 0.5);
+
+    background:
+        radial-gradient(
+            circle at center,
+            rgba(110, 190, 240, 0.065),
+            transparent 45%
+        );
+}
+
+.video-placeholder span {
+    font-size: 13px;
+}
+
+/* =========================================================
+   REMOTE INFO
+   ========================================================= */
+
+.remote-info,
+#remoteInfo {
+    position: absolute;
+
+    left: 14px;
+    top: 14px;
+
+    z-index: 5;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+    padding: 8px 12px;
+
+    border-radius: 12px;
+
+    background:
+        rgba(5, 15, 27, 0.42);
+
+    border: 1px solid rgba(220, 245, 255, 0.15);
+
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+
+    color: rgba(235, 249, 255, 0.86);
+
+    font-size: 13px;
+
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+#remoteCountry {
+    color: rgba(190, 225, 245, 0.65);
+}
+
+/* =========================================================
+   LOCAL VIDEO
+   ========================================================= */
+
+#localVideo {
+    position: absolute;
+
+    width: 150px;
+    height: 105px;
+
+    right: 15px;
+    bottom: 15px;
+
+    min-height: 0;
+
+    z-index: 8;
+
+    border-radius: 14px;
+
+    object-fit: cover;
+
+    border: 1px solid rgba(220, 245, 255, 0.25);
+
+    background: #03070d;
+
+    box-shadow:
+        0 12px 35px rgba(0, 0, 0, 0.4),
+        0 0 20px rgba(100, 190, 255, 0.08);
+}
+
+/* =========================================================
+   CHAT PANEL
+   ========================================================= */
+
+.chat-panel {
+    width: 340px;
+
+    min-width: 280px;
+
+    display: flex;
+
+    flex-direction: column;
+
+    overflow: hidden;
+
+    border-radius: 20px;
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(185, 225, 255, 0.075),
+            rgba(70, 120, 170, 0.035)
+        );
+
+    border: 1px solid rgba(220, 245, 255, 0.14);
+
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.065),
+        0 20px 55px rgba(0, 0, 0, 0.28);
+}
+
+/* =========================================================
+   CHAT HEADER
+   ========================================================= */
+
+.chat-header {
+    padding: 17px 18px;
+
+    border-bottom: 1px solid rgba(220, 245, 255, 0.1);
+
+    color: rgba(235, 249, 255, 0.88);
+
+    font-size: 14px;
+    font-weight: 700;
+
+    background:
+        rgba(200, 235, 255, 0.025);
+}
+
+/* =========================================================
+   CHAT MESSAGES
+   ========================================================= */
+
+#chatMessages {
+    flex: 1;
+
+    min-height: 260px;
+
+    padding: 15px;
+
+    overflow-y: auto;
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 8px;
+}
+
+#chatMessages::-webkit-scrollbar {
+    width: 5px;
+}
+
+#chatMessages::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#chatMessages::-webkit-scrollbar-thumb {
+    background: rgba(200, 235, 255, 0.14);
+
+    border-radius: 99px;
+}
+
+.chat-empty,
+#chatEmpty {
+    margin: auto;
+
+    text-align: center;
+
+    color: rgba(210, 235, 250, 0.36);
+
+    font-size: 13px;
+}
+
+/* =========================================================
+   CHAT MESSAGE
+   ========================================================= */
+
+.chat-message {
+    max-width: 84%;
+
+    padding: 9px 12px;
+
+    border-radius: 13px;
+
+    background:
+        rgba(190, 225, 250, 0.075);
+
+    border: 1px solid rgba(220, 245, 255, 0.095);
+
+    color: rgba(235, 248, 255, 0.82);
+
+    font-size: 13px;
+
+    line-height: 1.4;
+
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+
+    word-break: break-word;
+}
+
+.chat-message.mine {
+    align-self: flex-end;
+
+    background:
+        linear-gradient(
+            135deg,
+            rgba(145, 215, 255, 0.15),
+            rgba(100, 170, 230, 0.07)
+        );
+
+    border-color: rgba(185, 235, 255, 0.18);
+}
+
+/* =========================================================
+   CHAT INPUT AREA
+   ========================================================= */
+
+.chat-input-area {
+    display: flex;
+
+    gap: 8px;
+
+    padding: 12px;
+
+    border-top: 1px solid rgba(220, 245, 255, 0.1);
+
+    background:
+        rgba(3, 10, 19, 0.18);
+}
+
+#chatInput {
+    flex: 1;
+
+    min-width: 0;
+
+    height: 42px;
+
+    padding: 0 13px;
+
+    border-radius: 12px;
+
+    outline: none;
+
+    border: 1px solid rgba(220, 245, 255, 0.13);
+
+    background:
+        rgba(190, 225, 250, 0.06);
+
+    color: #edfaff;
+
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+
+    font-family: inherit;
+
+    font-size: 13px;
+
+    transition:
+        border-color 0.2s ease,
+        background 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+#chatInput::placeholder {
+    color: rgba(205, 230, 245, 0.34);
+}
+
+#chatInput:focus {
+    border-color: rgba(170, 230, 255, 0.34);
+
+    background:
+        rgba(200, 235, 255, 0.085);
+
+    box-shadow:
+        0 0 18px rgba(100, 190, 255, 0.08);
+}
+
+#chatSendButton {
+    width: 44px;
+    height: 42px;
+
+    padding: 0;
+
+    border-radius: 12px;
+
+    flex-shrink: 0;
+}
+
+/* =========================================================
+   CONTROL BUTTONS
+   ========================================================= */
+
+.controls {
+    width: 100%;
+
+    display: flex;
+
+    justify-content: center;
+
+    align-items: center;
+
+    gap: 10px;
+
+    margin-top: 18px;
+
+    flex-wrap: wrap;
+}
+
+.controls button {
+    min-height: 44px;
+
+    padding: 0 17px;
+
+    border-radius: 13px;
+
+    font-size: 13px;
+
+    font-weight: 600;
+}
+
+/* =========================================================
+   JOIN BUTTON
+   ========================================================= */
+
+#joinButton {
+    background:
+        linear-gradient(
+            135deg,
+            rgba(180, 235, 255, 0.19),
+            rgba(110, 190, 245, 0.08)
+        );
+
+    border-color: rgba(190, 240, 255, 0.32);
+
+    color: #eafaff;
+
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 0 25px rgba(100, 200, 255, 0.1);
+}
+
+#joinButton:hover:not(:disabled) {
+    background:
+        linear-gradient(
+            135deg,
+            rgba(205, 243, 255, 0.25),
+            rgba(125, 205, 250, 0.12)
+        );
+
+    border-color: rgba(210, 248, 255, 0.48);
+
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.17),
+        0 0 32px rgba(100, 205, 255, 0.16);
+}
+
+/* =========================================================
+   STOP BUTTON
+   ========================================================= */
+
+#leaveButton {
+    background:
+        linear-gradient(
+            135deg,
+            rgba(255, 125, 145, 0.095),
+            rgba(180, 90, 110, 0.035)
+        );
+
+    border-color: rgba(255, 160, 175, 0.17);
+
+    color: rgba(255, 205, 212, 0.82);
+}
+
+#leaveButton:hover:not(:disabled) {
+    background:
+        linear-gradient(
+            135deg,
+            rgba(255, 130, 150, 0.15),
+            rgba(190, 90, 110, 0.055)
+        );
+
+    border-color: rgba(255, 175, 190, 0.3);
+
+    box-shadow:
+        0 0 22px rgba(255, 100, 130, 0.08);
+}
+
+/* =========================================================
+   MIC / CAMERA
+   ========================================================= */
+
+#micButton,
+#cameraButton {
+    min-width: 44px;
+
+    padding-left: 13px;
+    padding-right: 13px;
+}
+
+/* =========================================================
+   CHECKBOXES / LABELS
+   ========================================================= */
+
+label {
+    color: rgba(220, 242, 255, 0.65);
+
+    font-size: 13px;
+}
+
+/* =========================================================
+   INPUTS
+   ========================================================= */
+
+input,
+select {
+    font-family: inherit;
+}
+
+/* =========================================================
+   SCROLLBAR
+   ========================================================= */
+
+::-webkit-scrollbar {
+    width: 7px;
+    height: 7px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.015);
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(200, 235, 255, 0.11);
+
+    border-radius: 999px;
+
+    border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(210, 240, 255, 0.18);
+}
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 950px) {
+
+    .app {
+        padding: 15px;
+    }
+
+    .content-area {
+        flex-direction: column;
+    }
+
+    .videos {
+        width: 100%;
+    }
+
+    .chat-panel {
+        width: 100%;
+        min-width: 0;
+
+        height: 310px;
+    }
+
+    .video-card {
+        min-height: 360px;
+    }
+
+    .video-card video {
+        min-height: 360px;
+    }
+}
+
+@media (max-width: 680px) {
+
+    .header {
+        margin-bottom: 15px;
+    }
+
+    .logo {
+        font-size: 23px;
+    }
+
+    #status {
+        font-size: 11px;
+        padding: 7px 10px;
+    }
+
+    .setup {
+        padding: 15px;
+    }
+
+    .gender-buttons {
+        flex-direction: column;
+    }
+
+    .gender-button {
+        width: 100%;
+    }
+
+    .videos {
+        grid-template-columns: 1fr;
+    }
+
+    .video-card {
+        min-height: 270px;
+    }
+
+    .video-card video {
+        min-height: 270px;
+    }
+
+    #localVideo {
+        width: 110px;
+        height: 78px;
+
+        right: 10px;
+        bottom: 10px;
+    }
+
+    .chat-panel {
+        height: 300px;
+    }
+
+    .controls {
+        gap: 7px;
+    }
+
+    .controls button {
+        flex: 1;
+
+        min-width: 100px;
+    }
+}
+
+/* =========================================================
+   VERY SMALL SCREENS
+   ========================================================= */
+
+@media (max-width: 420px) {
+
+    .app {
+        padding: 10px;
+    }
+
+    .logo {
+        font-size: 21px;
+    }
+
+    .video-card {
+        border-radius: 16px;
+    }
+
+    .chat-panel {
+        border-radius: 16px;
+    }
+
+    .controls button {
+        min-width: 85px;
+
+        padding-left: 10px;
+        padding-right: 10px;
+
+        font-size: 12px;
+    }
+}/* FIX: кнопки выбора пола должны быть поверх всех декоративных слоёв */
+.setup {
+    position: relative;
+    z-index: 100;
+}
+
+.setup button,
+.gender-button {
+    position: relative;
+    z-index: 101;
+    pointer-events: auto;
+    cursor: pointer;
+}
