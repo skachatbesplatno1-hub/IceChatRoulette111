@@ -16,16 +16,29 @@ const server = http.createServer(app);
 
 const PORT = process.env.PORT || 3000;
 
+/* =========================
+   EXPRESS
+   ========================= */
+
 app.use(
     express.json({
         limit: "5mb"
     })
 );
 
+/*
+ * ВАЖНО:
+ * Все файлы сайта находятся в корне репозитория:
+ *
+ * index.html
+ * app.js
+ * style.css
+ * admin.html
+ *
+ * Поэтому public/ здесь НЕ используется.
+ */
 app.use(
-    express.static(
-        path.join(__dirname, "public")
-    )
+    express.static(__dirname)
 );
 
 /* =========================
@@ -37,20 +50,13 @@ const matches = new Map();
 const matchRooms = new Map();
 
 /*
- * userId  = постоянный пользователь
+ * userId = постоянный пользователь
  * socketId = конкретная вкладка / сессия
  */
 
 /* =========================
    LIVEKIT STATE
    ========================= */
-
-/*
- * roomName -> Map(userId -> Set(identity))
- *
- * Один пользователь может иметь
- * несколько вкладок одновременно.
- */
 
 const liveKitParticipants = new Map();
 
@@ -83,22 +89,12 @@ function getLiveKitHttpUrl() {
 
     url = url.trim();
 
-    if (
-        url.startsWith("wss://")
-    ) {
-        return (
-            "https://" +
-            url.slice(6)
-        );
+    if (url.startsWith("wss://")) {
+        return "https://" + url.slice(6);
     }
 
-    if (
-        url.startsWith("ws://")
-    ) {
-        return (
-            "http://" +
-            url.slice(5)
-        );
+    if (url.startsWith("ws://")) {
+        return "http://" + url.slice(5);
     }
 
     return url;
@@ -126,9 +122,7 @@ if (
 function randomId(prefix) {
     return (
         prefix +
-        crypto
-            .randomBytes(12)
-            .toString("hex")
+        crypto.randomBytes(12).toString("hex")
     );
 }
 
@@ -142,30 +136,23 @@ function parseCookies(req) {
 
     const cookies = {};
 
-    header
-        .split(";")
-        .forEach(function (part) {
-            const index =
-                part.indexOf("=");
+    header.split(";").forEach(function (part) {
+        const index = part.indexOf("=");
 
-            if (index === -1) {
-                return;
-            }
+        if (index === -1) {
+            return;
+        }
 
-            const key =
-                part
-                    .slice(0, index)
-                    .trim();
+        const key =
+            part.slice(0, index).trim();
 
-            const value =
-                decodeURIComponent(
-                    part
-                        .slice(index + 1)
-                        .trim()
-                );
+        const value =
+            decodeURIComponent(
+                part.slice(index + 1).trim()
+            );
 
-            cookies[key] = value;
-        });
+        cookies[key] = value;
+    });
 
     return cookies;
 }
@@ -181,9 +168,7 @@ function setCookie(
 
     cookie += "; Path=/";
 
-    if (
-        options.httpOnly !== false
-    ) {
+    if (options.httpOnly !== false) {
         cookie += "; HttpOnly";
     }
 
@@ -192,9 +177,7 @@ function setCookie(
             `; SameSite=${options.sameSite}`;
     }
 
-    if (
-        options.maxAge !== undefined
-    ) {
+    if (options.maxAge !== undefined) {
         cookie +=
             `; Max-Age=${options.maxAge}`;
     }
@@ -209,10 +192,7 @@ function setCookie(
     );
 }
 
-function clearCookie(
-    res,
-    name
-) {
+function clearCookie(res, name) {
     res.append(
         "Set-Cookie",
         `${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict`
@@ -223,10 +203,7 @@ function clearCookie(
    USER ID
    ========================= */
 
-function ensureUserId(
-    req,
-    res
-) {
+function ensureUserId(req, res) {
     const cookies =
         parseCookies(req);
 
@@ -235,9 +212,7 @@ function ensureUserId(
 
     if (
         !userId ||
-        !/^usr_[a-f0-9]{24}$/.test(
-            userId
-        )
+        !/^usr_[a-f0-9]{24}$/.test(userId)
     ) {
         userId =
             randomId("usr_");
@@ -271,9 +246,7 @@ function getUserId(req) {
 
     if (
         !userId ||
-        !/^usr_[a-f0-9]{24}$/.test(
-            userId
-        )
+        !/^usr_[a-f0-9]{24}$/.test(userId)
     ) {
         return null;
     }
@@ -287,9 +260,7 @@ function getUserId(req) {
 
 function readJsonArray(file) {
     try {
-        if (
-            !fs.existsSync(file)
-        ) {
+        if (!fs.existsSync(file)) {
             return [];
         }
 
@@ -316,10 +287,7 @@ function readJsonArray(file) {
     }
 }
 
-function writeJsonArray(
-    file,
-    data
-) {
+function writeJsonArray(file, data) {
     fs.writeFileSync(
         file,
         JSON.stringify(
@@ -337,9 +305,7 @@ function readReports() {
     );
 }
 
-function writeReports(
-    reports
-) {
+function writeReports(reports) {
     writeJsonArray(
         REPORTS_FILE,
         reports
@@ -352,9 +318,7 @@ function readBans() {
     );
 }
 
-function writeBans(
-    bans
-) {
+function writeBans(bans) {
     writeJsonArray(
         BANS_FILE,
         bans
@@ -365,9 +329,7 @@ function writeBans(
    BAN CHECK
    ========================= */
 
-function getActiveBan(
-    userId
-) {
+function getActiveBan(userId) {
     if (!userId) {
         return null;
     }
@@ -377,44 +339,31 @@ function getActiveBan(
 
     let changed = false;
 
-    const now =
-        Date.now();
+    const now = Date.now();
 
     const activeBans =
-        bans.filter(
-            function (ban) {
-
-                if (
-                    ban.expiresAt &&
-                    new Date(
-                        ban.expiresAt
-                    ).getTime() <=
-                        now
-                ) {
-                    changed = true;
-
-                    return false;
-                }
-
-                return true;
+        bans.filter(function (ban) {
+            if (
+                ban.expiresAt &&
+                new Date(
+                    ban.expiresAt
+                ).getTime() <= now
+            ) {
+                changed = true;
+                return false;
             }
-        );
+
+            return true;
+        });
 
     if (changed) {
-        writeBans(
-            activeBans
-        );
+        writeBans(activeBans);
     }
 
     return (
-        activeBans.find(
-            function (ban) {
-                return (
-                    ban.userId ===
-                    userId
-                );
-            }
-        ) || null
+        activeBans.find(function (ban) {
+            return ban.userId === userId;
+        }) || null
     );
 }
 
@@ -422,11 +371,7 @@ function getActiveBan(
    ADMIN AUTH
    ========================= */
 
-function requireAdmin(
-    req,
-    res,
-    next
-) {
+function requireAdmin(req, res, next) {
     const cookies =
         parseCookies(req);
 
@@ -435,9 +380,7 @@ function requireAdmin(
 
     if (
         !sessionId ||
-        !adminSessions.has(
-            sessionId
-        )
+        !adminSessions.has(sessionId)
     ) {
         return res.status(401).json({
             error:
@@ -454,9 +397,7 @@ function requireAdmin(
 
 function getClientIp(req) {
     const forwarded =
-        req.headers[
-            "x-forwarded-for"
-        ];
+        req.headers["x-forwarded-for"];
 
     if (forwarded) {
         return forwarded
@@ -465,16 +406,11 @@ function getClientIp(req) {
     }
 
     return (
-        req.headers[
-            "cf-connecting-ip"
-        ] ||
+        req.headers["cf-connecting-ip"] ||
         req.socket.remoteAddress ||
         ""
     )
-        .replace(
-            "::ffff:",
-            ""
-        )
+        .replace("::ffff:", "")
         .trim();
 }
 
@@ -520,9 +456,7 @@ function countryName(code) {
 
 async function getCountry(req) {
     if (
-        req.headers[
-            "cf-ipcountry"
-        ]
+        req.headers["cf-ipcountry"]
     ) {
         const code =
             req.headers[
@@ -531,20 +465,14 @@ async function getCountry(req) {
 
         if (code !== "XX") {
             return {
-                code:
-                    code,
-                name:
-                    countryName(
-                        code
-                    )
+                code: code,
+                name: countryName(code)
             };
         }
     }
 
     if (
-        req.headers[
-            "x-country-code"
-        ]
+        req.headers["x-country-code"]
     ) {
         const code =
             req.headers[
@@ -552,13 +480,8 @@ async function getCountry(req) {
             ].toUpperCase();
 
         return {
-            code:
-                code,
-
-            name:
-                countryName(
-                    code
-                )
+            code: code,
+            name: countryName(code)
         };
     }
 
@@ -571,11 +494,8 @@ async function getCountry(req) {
         ip === "::1"
     ) {
         return {
-            code:
-                "UN",
-
-            name:
-                "Неизвестно"
+            code: "UN",
+            name: "Неизвестно"
         };
     }
 
@@ -596,14 +516,11 @@ async function getCountry(req) {
 
         const code =
             String(
-                data.country_code ||
-                "UN"
+                data.country_code || "UN"
             ).toUpperCase();
 
         return {
-            code:
-                code,
-
+            code: code,
             name:
                 data.country_name ||
                 countryName(code)
@@ -616,11 +533,8 @@ async function getCountry(req) {
         );
 
         return {
-            code:
-                "UN",
-
-            name:
-                "Неизвестно"
+            code: "UN",
+            name: "Неизвестно"
         };
     }
 }
@@ -635,9 +549,7 @@ function registerLiveKitParticipant(
     identity
 ) {
     if (
-        !liveKitParticipants.has(
-            roomName
-        )
+        !liveKitParticipants.has(roomName)
     ) {
         liveKitParticipants.set(
             roomName,
@@ -646,15 +558,9 @@ function registerLiveKitParticipant(
     }
 
     const roomUsers =
-        liveKitParticipants.get(
-            roomName
-        );
+        liveKitParticipants.get(roomName);
 
-    if (
-        !roomUsers.has(
-            userId
-        )
-    ) {
+    if (!roomUsers.has(userId)) {
         roomUsers.set(
             userId,
             new Set()
@@ -671,26 +577,20 @@ function getLiveKitIdentities(
     userId
 ) {
     const roomUsers =
-        liveKitParticipants.get(
-            roomName
-        );
+        liveKitParticipants.get(roomName);
 
     if (!roomUsers) {
         return [];
     }
 
     const identities =
-        roomUsers.get(
-            userId
-        );
+        roomUsers.get(userId);
 
     if (!identities) {
         return [];
     }
 
-    return Array.from(
-        identities
-    );
+    return Array.from(identities);
 }
 
 function removeTrackedIdentity(
@@ -699,41 +599,27 @@ function removeTrackedIdentity(
     identity
 ) {
     const roomUsers =
-        liveKitParticipants.get(
-            roomName
-        );
+        liveKitParticipants.get(roomName);
 
     if (!roomUsers) {
         return;
     }
 
     const identities =
-        roomUsers.get(
-            userId
-        );
+        roomUsers.get(userId);
 
     if (!identities) {
         return;
     }
 
-    identities.delete(
-        identity
-    );
+    identities.delete(identity);
 
-    if (
-        identities.size === 0
-    ) {
-        roomUsers.delete(
-            userId
-        );
+    if (identities.size === 0) {
+        roomUsers.delete(userId);
     }
 
-    if (
-        roomUsers.size === 0
-    ) {
-        liveKitParticipants.delete(
-            roomName
-        );
+    if (roomUsers.size === 0) {
+        liveKitParticipants.delete(roomName);
     }
 }
 
@@ -741,9 +627,7 @@ async function kickUserFromRoom(
     roomName,
     userId
 ) {
-    if (
-        !liveKitRoomService
-    ) {
+    if (!liveKitRoomService) {
         console.warn(
             "LiveKit RoomService недоступен."
         );
@@ -757,16 +641,11 @@ async function kickUserFromRoom(
             userId
         );
 
-    if (
-        identities.length === 0
-    ) {
+    if (identities.length === 0) {
         return;
     }
 
-    for (
-        const identity
-        of identities
-    ) {
+    for (const identity of identities) {
         try {
             await liveKitRoomService
                 .removeParticipant(
@@ -799,12 +678,8 @@ async function kickUserFromRoom(
 
 app.get(
     "/api/livekit-token",
-    async function (
-        req,
-        res
-    ) {
+    async function (req, res) {
         try {
-
             const room =
                 req.query.room;
 
@@ -822,18 +697,14 @@ app.get(
                 );
 
             const ban =
-                getActiveBan(
-                    userId
-                );
+                getActiveBan(userId);
 
             if (ban) {
                 return res.status(403).json({
                     error:
                         "USER_BANNED",
-
                     reason:
                         ban.reason,
-
                     expiresAt:
                         ban.expiresAt
                 });
@@ -843,9 +714,7 @@ app.get(
                 "user-" +
                 crypto
                     .randomBytes(8)
-                    .toString(
-                        "hex"
-                    );
+                    .toString("hex");
 
             const token =
                 new AccessToken(
@@ -858,11 +727,8 @@ app.get(
                 );
 
             token.addGrant({
-                roomJoin:
-                    true,
-
-                room:
-                    room
+                roomJoin: true,
+                room: room
             });
 
             const jwt =
@@ -875,18 +741,14 @@ app.get(
             );
 
             return res.json({
-                token:
-                    jwt,
-
+                token: jwt,
                 url:
                     process.env.LIVEKIT_URL,
-
                 identity:
                     identity
             });
 
         } catch (error) {
-
             console.error(
                 "LiveKit token error:",
                 error
@@ -906,12 +768,8 @@ app.get(
 
 app.post(
     "/api/match/start",
-    async function (
-        req,
-        res
-    ) {
+    async function (req, res) {
         try {
-
             const userId =
                 ensureUserId(
                     req,
@@ -919,18 +777,14 @@ app.post(
                 );
 
             const ban =
-                getActiveBan(
-                    userId
-                );
+                getActiveBan(userId);
 
             if (ban) {
                 return res.status(403).json({
                     error:
                         "USER_BANNED",
-
                     reason:
                         ban.reason,
-
                     expiresAt:
                         ban.expiresAt
                 });
@@ -944,8 +798,7 @@ app.post(
 
             if (
                 !socketId ||
-                typeof socketId !==
-                    "string"
+                typeof socketId !== "string"
             ) {
                 return res.status(400).json({
                     error:
@@ -955,8 +808,7 @@ app.post(
 
             if (
                 !gender ||
-                typeof gender !==
-                    "string"
+                typeof gender !== "string"
             ) {
                 return res.status(400).json({
                     error:
@@ -965,39 +817,22 @@ app.post(
             }
 
             const normalizedSearchGender =
-                searchGender ===
-                    "male" ||
-                searchGender ===
-                    "female"
+                searchGender === "male" ||
+                searchGender === "female"
                     ? searchGender
                     : "any";
 
-            waitingUsers.delete(
-                socketId
-            );
+            waitingUsers.delete(socketId);
+            matches.delete(socketId);
 
-            matches.delete(
-                socketId
-            );
-
-            let matchedId =
-                null;
-
-            let matchedUser =
-                null;
+            let matchedId = null;
+            let matchedUser = null;
 
             for (
-                const [
-                    id,
-                    user
-                ]
+                const [id, user]
                 of waitingUsers
             ) {
-
-                if (
-                    id ===
-                    socketId
-                ) {
+                if (id === socketId) {
                     continue;
                 }
 
@@ -1029,12 +864,8 @@ app.post(
                     continue;
                 }
 
-                matchedId =
-                    id;
-
-                matchedUser =
-                    user;
-
+                matchedId = id;
+                matchedUser = user;
                 break;
             }
 
@@ -1042,7 +873,6 @@ app.post(
                 matchedId &&
                 matchedUser
             ) {
-
                 waitingUsers.delete(
                     matchedId
                 );
@@ -1053,14 +883,10 @@ app.post(
                     "-" +
                     crypto
                         .randomBytes(4)
-                        .toString(
-                            "hex"
-                        );
+                        .toString("hex");
 
                 const currentUserCountry =
-                    await getCountry(
-                        req
-                    );
+                    await getCountry(req);
 
                 matches.set(
                     matchedId,
@@ -1121,9 +947,7 @@ app.post(
             }
 
             const country =
-                await getCountry(
-                    req
-                );
+                await getCountry(req);
 
             waitingUsers.set(
                 socketId,
@@ -1154,7 +978,6 @@ app.post(
             });
 
         } catch (error) {
-
             console.error(
                 "Match start error:",
                 error
@@ -1174,10 +997,7 @@ app.post(
 
 app.get(
     "/api/match/check",
-    function (
-        req,
-        res
-    ) {
+    function (req, res) {
         const socketId =
             req.query.socketId;
 
@@ -1193,9 +1013,8 @@ app.get(
                 roomName,
                 matchData
             ]
-            of matchRooms
+                of matchRooms
         ) {
-
             if (
                 !matchData.users.includes(
                     socketId
@@ -1208,8 +1027,7 @@ app.get(
                 matchData.users.find(
                     function (id) {
                         return (
-                            id !==
-                            socketId
+                            id !== socketId
                         );
                     }
                 );
@@ -1231,7 +1049,6 @@ app.get(
                     otherUser
                 )
             ) {
-
                 matchData.endedFor.add(
                     socketId
                 );
@@ -1244,9 +1061,7 @@ app.get(
         }
 
         const match =
-            matches.get(
-                socketId
-            );
+            matches.get(socketId);
 
         if (!match) {
             return res.json({
@@ -1255,9 +1070,7 @@ app.get(
             });
         }
 
-        matches.delete(
-            socketId
-        );
+        matches.delete(socketId);
 
         return res.json({
             status:
@@ -1278,11 +1091,7 @@ app.get(
 
 app.post(
     "/api/match/stop",
-    function (
-        req,
-        res
-    ) {
-
+    function (req, res) {
         const {
             socketId
         } = req.body;
@@ -1294,22 +1103,16 @@ app.post(
             });
         }
 
-        waitingUsers.delete(
-            socketId
-        );
-
-        matches.delete(
-            socketId
-        );
+        waitingUsers.delete(socketId);
+        matches.delete(socketId);
 
         for (
             const [
                 roomName,
                 matchData
             ]
-            of matchRooms
+                of matchRooms
         ) {
-
             if (
                 !matchData.users.includes(
                     socketId
@@ -1323,11 +1126,8 @@ app.post(
             );
 
             if (
-                matchData
-                    .endedFor
-                    .size >= 2
+                matchData.endedFor.size >= 2
             ) {
-
                 matchRooms.delete(
                     roomName
                 );
@@ -1353,17 +1153,10 @@ app.post(
 
 app.post(
     "/api/report",
-    function (
-        req,
-        res
-    ) {
-
+    function (req, res) {
         try {
-
             const reporterId =
-                getUserId(
-                    req
-                );
+                getUserId(req);
 
             if (!reporterId) {
                 return res.status(400).json({
@@ -1383,8 +1176,7 @@ app.post(
 
             if (
                 !reason ||
-                typeof reason !==
-                    "string"
+                typeof reason !== "string"
             ) {
                 return res.status(400).json({
                     error:
@@ -1394,8 +1186,7 @@ app.post(
 
             if (
                 !roomName ||
-                typeof roomName !==
-                    "string"
+                typeof roomName !== "string"
             ) {
                 return res.status(400).json({
                     error:
@@ -1404,9 +1195,7 @@ app.post(
             }
 
             const matchData =
-                matchRooms.get(
-                    roomName
-                );
+                matchRooms.get(roomName);
 
             if (!matchData) {
                 return res.status(400).json({
@@ -1420,10 +1209,7 @@ app.post(
                     reporterId
                 );
 
-            if (
-                reporterIndex ===
-                -1
-            ) {
+            if (reporterIndex === -1) {
                 return res.status(403).json({
                     error:
                         "You are not a member of this room"
@@ -1450,45 +1236,30 @@ app.post(
             const cleanReason =
                 reason
                     .trim()
-                    .substring(
-                        0,
-                        200
-                    );
+                    .substring(0, 200);
 
             const cleanDetails =
-                typeof details ===
-                    "string"
+                typeof details === "string"
                     ? details
                         .trim()
-                        .substring(
-                            0,
-                            1000
-                        )
+                        .substring(0, 1000)
                     : "";
 
-            let safeChatHistory =
-                [];
+            let safeChatHistory = [];
 
             if (
-                Array.isArray(
-                    chatHistory
-                )
+                Array.isArray(chatHistory)
             ) {
-
                 safeChatHistory =
                     chatHistory
                         .slice(0, 1000)
                         .map(
-                            function (
-                                item
-                            ) {
+                            function (item) {
                                 return {
-
                                     side:
                                         item &&
                                         (
-                                            item.side ===
-                                                "Вы" ||
+                                            item.side === "Вы" ||
                                             item.side ===
                                                 "Собеседник"
                                         )
@@ -1517,24 +1288,17 @@ app.post(
                         );
             }
 
-            let safeEvidenceImage =
-                null;
+            let safeEvidenceImage = null;
 
             if (
-                typeof evidenceImage ===
-                    "string" &&
+                typeof evidenceImage === "string" &&
                 evidenceImage.startsWith(
                     "data:image/"
-                )
+                ) &&
+                evidenceImage.length <= 3000000
             ) {
-
-                if (
-                    evidenceImage.length <=
-                    3000000
-                ) {
-                    safeEvidenceImage =
-                        evidenceImage;
-                }
+                safeEvidenceImage =
+                    evidenceImage;
             }
 
             const reports =
@@ -1542,9 +1306,7 @@ app.post(
 
             const duplicate =
                 reports.find(
-                    function (
-                        report
-                    ) {
+                    function (report) {
                         return (
                             report.reporterId ===
                                 reporterId &&
@@ -1569,11 +1331,8 @@ app.post(
             }
 
             const report = {
-
                 id:
-                    randomId(
-                        "report_"
-                    ),
+                    randomId("report_"),
 
                 reason:
                     cleanReason,
@@ -1600,8 +1359,7 @@ app.post(
                     "",
 
                 createdAt:
-                    new Date()
-                        .toISOString(),
+                    new Date().toISOString(),
 
                 reviewedAt:
                     null,
@@ -1620,13 +1378,9 @@ app.post(
                     safeChatHistory
             };
 
-            reports.push(
-                report
-            );
+            reports.push(report);
 
-            writeReports(
-                reports
-            );
+            writeReports(reports);
 
             console.log(
                 "Новая жалоба:",
@@ -1642,7 +1396,6 @@ app.post(
             });
 
         } catch (error) {
-
             console.error(
                 "Report error:",
                 error
@@ -1662,11 +1415,7 @@ app.post(
 
 app.post(
     "/api/admin/login",
-    function (
-        req,
-        res
-    ) {
-
+    function (req, res) {
         if (!ADMIN_PASSWORD) {
             return res.status(500).json({
                 error:
@@ -1691,9 +1440,7 @@ app.post(
         }
 
         const sessionId =
-            randomId(
-                "adm_"
-            );
+            randomId("adm_");
 
         adminSessions.set(
             sessionId,
@@ -1708,12 +1455,8 @@ app.post(
             "icechat_admin",
             sessionId,
             {
-                httpOnly:
-                    true,
-
-                sameSite:
-                    "Strict",
-
+                httpOnly: true,
+                sameSite: "Strict",
                 maxAge:
                     60 *
                     60 *
@@ -1735,11 +1478,7 @@ app.post(
 app.post(
     "/api/admin/logout",
     requireAdmin,
-    function (
-        req,
-        res
-    ) {
-
+    function (req, res) {
         const cookies =
             parseCookies(req);
 
@@ -1766,11 +1505,7 @@ app.post(
 app.get(
     "/api/admin/me",
     requireAdmin,
-    function (
-        req,
-        res
-    ) {
-
+    function (req, res) {
         return res.json({
             status:
                 "ok"
@@ -1785,28 +1520,18 @@ app.get(
 app.get(
     "/api/admin/reports",
     requireAdmin,
-    function (
-        req,
-        res
-    ) {
-
+    function (req, res) {
         const reports =
             readReports();
 
         reports.sort(
-            function (
-                a,
-                b
-            ) {
-
+            function (a, b) {
                 return (
                     new Date(
-                        b.createdAt ||
-                        0
+                        b.createdAt || 0
                     ).getTime() -
                     new Date(
-                        a.createdAt ||
-                        0
+                        a.createdAt || 0
                     ).getTime()
                 );
             }
@@ -1826,13 +1551,8 @@ app.get(
 app.post(
     "/api/admin/reports/:reportId/action",
     requireAdmin,
-    async function (
-        req,
-        res
-    ) {
-
+    async function (req, res) {
         try {
-
             const reportId =
                 req.params.reportId;
 
@@ -1847,9 +1567,7 @@ app.post(
 
             const report =
                 reports.find(
-                    function (
-                        item
-                    ) {
+                    function (item) {
                         return (
                             item.id ===
                             reportId
@@ -1865,25 +1583,15 @@ app.post(
             }
 
             const cleanNote =
-                typeof note ===
-                    "string"
+                typeof note === "string"
                     ? note
                         .trim()
-                        .substring(
-                            0,
-                            1000
-                        )
+                        .substring(0, 1000)
                     : "";
 
-            /* =========================
-               REJECT
-               ========================= */
+            /* REJECT */
 
-            if (
-                action ===
-                "reject"
-            ) {
-
+            if (action === "reject") {
                 report.status =
                     "rejected";
 
@@ -1891,12 +1599,9 @@ app.post(
                     cleanNote;
 
                 report.reviewedAt =
-                    new Date()
-                        .toISOString();
+                    new Date().toISOString();
 
-                writeReports(
-                    reports
-                );
+                writeReports(reports);
 
                 return res.json({
                     status:
@@ -1904,15 +1609,9 @@ app.post(
                 });
             }
 
-            /* =========================
-               WARNING
-               ========================= */
+            /* WARNING */
 
-            if (
-                action ===
-                "warn"
-            ) {
-
+            if (action === "warn") {
                 report.status =
                     "warning";
 
@@ -1920,12 +1619,9 @@ app.post(
                     cleanNote;
 
                 report.reviewedAt =
-                    new Date()
-                        .toISOString();
+                    new Date().toISOString();
 
-                writeReports(
-                    reports
-                );
+                writeReports(reports);
 
                 return res.json({
                     status:
@@ -1933,18 +1629,10 @@ app.post(
                 });
             }
 
-            /* =========================
-               BAN
-               ========================= */
+            /* BAN */
 
-            if (
-                action ===
-                "ban"
-            ) {
-
-                if (
-                    !report.targetUserId
-                ) {
+            if (action === "ban") {
+                if (!report.targetUserId) {
                     return res.status(400).json({
                         error:
                             "В этой старой жалобе нет ID нарушителя. Новые жалобы будут содержать его автоматически."
@@ -1956,9 +1644,7 @@ app.post(
 
                 const existingIndex =
                     bans.findIndex(
-                        function (
-                            ban
-                        ) {
+                        function (ban) {
                             return (
                                 ban.userId ===
                                 report.targetUserId
@@ -1966,42 +1652,21 @@ app.post(
                         }
                     );
 
-                /*
-                 * Поддерживаем:
-                 *
-                 * minute   = 1 минута
-                 * 1day     = 1 день
-                 * 3days    = 3 дня
-                 * 7days    = 7 дней
-                 * 30days   = 30 дней
-                 * permanent = навсегда
-                 *
-                 * Старое значение "24"
-                 * тоже оставляем для совместимости.
-                 */
-
-                let expiresAt =
-                    null;
+                let expiresAt = null;
 
                 if (
-                    duration ===
-                    "minute"
+                    duration === "minute"
                 ) {
-
                     expiresAt =
                         new Date(
                             Date.now() +
-                            60 *
-                            1000
+                            60 * 1000
                         ).toISOString();
 
                 } else if (
-                    duration ===
-                    "1day" ||
-                    duration ===
-                    "24"
+                    duration === "1day" ||
+                    duration === "24"
                 ) {
-
                     expiresAt =
                         new Date(
                             Date.now() +
@@ -2013,10 +1678,8 @@ app.post(
                         ).toISOString();
 
                 } else if (
-                    duration ===
-                    "3days"
+                    duration === "3days"
                 ) {
-
                     expiresAt =
                         new Date(
                             Date.now() +
@@ -2028,10 +1691,8 @@ app.post(
                         ).toISOString();
 
                 } else if (
-                    duration ===
-                    "7days"
+                    duration === "7days"
                 ) {
-
                     expiresAt =
                         new Date(
                             Date.now() +
@@ -2043,10 +1704,8 @@ app.post(
                         ).toISOString();
 
                 } else if (
-                    duration ===
-                    "30days"
+                    duration === "30days"
                 ) {
-
                     expiresAt =
                         new Date(
                             Date.now() +
@@ -2058,18 +1717,13 @@ app.post(
                         ).toISOString();
 
                 } else if (
-                    duration ===
-                    "permanent"
+                    duration === "permanent"
                 ) {
-
-                    expiresAt =
-                        null;
+                    expiresAt = null;
 
                 } else if (
-                    typeof duration ===
-                        "number"
+                    typeof duration === "number"
                 ) {
-
                     if (
                         !Number.isFinite(
                             duration
@@ -2092,13 +1746,6 @@ app.post(
                         ).toISOString();
 
                 } else {
-
-                    /*
-                     * Если что-то неизвестное,
-                     * безопасно используем
-                     * бан на 1 день.
-                     */
-
                     expiresAt =
                         new Date(
                             Date.now() +
@@ -2111,7 +1758,6 @@ app.post(
                 }
 
                 const ban = {
-
                     userId:
                         report.targetUserId,
 
@@ -2122,32 +1768,22 @@ app.post(
                         cleanNote,
 
                     createdAt:
-                        new Date()
-                            .toISOString(),
+                        new Date().toISOString(),
 
                     expiresAt:
                         expiresAt
                 };
 
                 if (
-                    existingIndex !==
-                    -1
+                    existingIndex !== -1
                 ) {
-
-                    bans[
-                        existingIndex
-                    ] = ban;
-
+                    bans[existingIndex] =
+                        ban;
                 } else {
-
-                    bans.push(
-                        ban
-                    );
+                    bans.push(ban);
                 }
 
-                writeBans(
-                    bans
-                );
+                writeBans(bans);
 
                 report.status =
                     "banned";
@@ -2156,16 +1792,11 @@ app.post(
                     cleanNote;
 
                 report.reviewedAt =
-                    new Date()
-                        .toISOString();
+                    new Date().toISOString();
 
-                writeReports(
-                    reports
-                );
+                writeReports(reports);
 
-                /* =========================
-                   УДАЛЯЕМ ИЗ ОЧЕРЕДИ
-                   ========================= */
+                /* REMOVE FROM MATCHING QUEUE */
 
                 for (
                     const [
@@ -2174,12 +1805,10 @@ app.post(
                     ]
                         of waitingUsers
                 ) {
-
                     if (
                         user.userId ===
                         report.targetUserId
                     ) {
-
                         waitingUsers.delete(
                             socketId
                         );
@@ -2190,12 +1819,9 @@ app.post(
                     }
                 }
 
-                /* =========================
-                   KICK ИЗ LIVEKIT
-                   ========================= */
+                /* KICK FROM LIVEKIT */
 
-                let kickedCount =
-                    0;
+                let kickedCount = 0;
 
                 for (
                     const [
@@ -2204,7 +1830,6 @@ app.post(
                     ]
                         of matchRooms
                 ) {
-
                     if (
                         !matchData.userIds ||
                         !matchData.userIds.includes(
@@ -2220,24 +1845,17 @@ app.post(
                     );
 
                     const targetIndex =
-                        matchData.userIds
-                            .indexOf(
-                                report.targetUserId
-                            );
+                        matchData.userIds.indexOf(
+                            report.targetUserId
+                        );
 
-                    if (
-                        targetIndex !==
-                        -1
-                    ) {
-
+                    if (targetIndex !== -1) {
                         const targetSocket =
                             matchData.users[
                                 targetIndex
                             ];
 
-                        if (
-                            targetSocket
-                        ) {
+                        if (targetSocket) {
                             matchData.endedFor.add(
                                 targetSocket
                             );
@@ -2245,11 +1863,6 @@ app.post(
                             kickedCount++;
                         }
                     }
-
-                    /*
-                     * Второй участник обнаружит
-                     * peerLeft через /api/match/check.
-                     */
                 }
 
                 return res.json({
@@ -2270,7 +1883,6 @@ app.post(
             });
 
         } catch (error) {
-
             console.error(
                 "Admin report action error:",
                 error
@@ -2291,11 +1903,7 @@ app.post(
 app.get(
     "/api/admin/bans",
     requireAdmin,
-    function (
-        req,
-        res
-    ) {
-
+    function (req, res) {
         const bans =
             readBans();
 
@@ -2304,16 +1912,12 @@ app.get(
 
         const activeBans =
             bans.filter(
-                function (
-                    ban
-                ) {
-
+                function (ban) {
                     if (
                         ban.expiresAt &&
                         new Date(
                             ban.expiresAt
-                        ).getTime() <=
-                        now
+                        ).getTime() <= now
                     ) {
                         return false;
                     }
@@ -2326,9 +1930,7 @@ app.get(
             activeBans.length !==
             bans.length
         ) {
-            writeBans(
-                activeBans
-            );
+            writeBans(activeBans);
         }
 
         return res.json({
@@ -2345,11 +1947,7 @@ app.get(
 app.post(
     "/api/admin/bans/:userId/unban",
     requireAdmin,
-    function (
-        req,
-        res
-    ) {
-
+    function (req, res) {
         const userId =
             req.params.userId;
 
@@ -2358,9 +1956,7 @@ app.post(
 
         const updated =
             bans.filter(
-                function (
-                    ban
-                ) {
+                function (ban) {
                     return (
                         ban.userId !==
                         userId
@@ -2368,9 +1964,7 @@ app.post(
                 }
             );
 
-        writeBans(
-            updated
-        );
+        writeBans(updated);
 
         return res.json({
             status:
@@ -2385,16 +1979,27 @@ app.post(
 
 app.get(
     "/admin",
-    function (
-        req,
-        res
-    ) {
-
+    function (req, res) {
         return res.sendFile(
             path.join(
                 __dirname,
-                "public",
                 "admin.html"
+            )
+        );
+    }
+);
+
+/* =========================
+   ROOT PAGE
+   ========================= */
+
+app.get(
+    "/",
+    function (req, res) {
+        return res.sendFile(
+            path.join(
+                __dirname,
+                "index.html"
             )
         );
     }
@@ -2406,13 +2011,8 @@ app.get(
 
 app.get(
     "/api/match/status",
-    function (
-        req,
-        res
-    ) {
-
+    function (req, res) {
         return res.json({
-
             waiting:
                 waitingUsers.size,
 
@@ -2434,7 +2034,6 @@ app.get(
 
 setInterval(
     function () {
-
         const now =
             Date.now();
 
@@ -2450,14 +2049,12 @@ setInterval(
             ]
                 of waitingUsers
         ) {
-
             if (
                 !user.createdAt ||
                 now -
                     user.createdAt >
                     MAX_WAIT
             ) {
-
                 waitingUsers.delete(
                     socketId
                 );
@@ -2467,42 +2064,52 @@ setInterval(
                 );
             }
         }
-
     },
-    30 *
-    1000
+    30 * 1000
 );
-
-/*
- * Дополнительная очистка
- * старых LiveKit записей.
- */
 
 setInterval(
     function () {
-
         for (
             const [
                 roomName
             ]
                 of liveKitParticipants
         ) {
-
             if (
                 !matchRooms.has(
                     roomName
                 )
             ) {
-
                 liveKitParticipants.delete(
                     roomName
                 );
             }
         }
-
     },
-    60 *
-    1000
+    60 * 1000
+);
+
+/* =========================
+   ERROR HANDLER
+   ========================= */
+
+app.use(
+    function (err, req, res, next) {
+        console.error(
+            "Express error:",
+            err
+        );
+
+        if (res.headersSent) {
+            return next(err);
+        }
+
+        return res.status(500).json({
+            error:
+                "Internal server error"
+        });
+    }
 );
 
 /* =========================
@@ -2513,30 +2120,21 @@ server.listen(
     PORT,
     "0.0.0.0",
     function () {
-
         console.log(
             `IceChat запущен на порту ${PORT}`
         );
 
-        if (
-            !ADMIN_PASSWORD
-        ) {
-
+        if (!ADMIN_PASSWORD) {
             console.warn(
-                "ВНИМАНИЕ: ADMIN_PASSWORD не задан в .env"
+                "ВНИМАНИЕ: ADMIN_PASSWORD не задан в Render Environment Variables"
             );
         }
 
-        if (
-            liveKitRoomService
-        ) {
-
+        if (liveKitRoomService) {
             console.log(
                 "LiveKit moderation: ON"
             );
-
         } else {
-
             console.warn(
                 "ВНИМАНИЕ: LiveKit moderation OFF — проверь LIVEKIT_URL/API KEY/SECRET"
             );
