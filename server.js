@@ -26,17 +26,6 @@ app.use(
     })
 );
 
-/*
- * ВАЖНО:
- * Все файлы сайта находятся в корне репозитория:
- *
- * index.html
- * app.js
- * style.css
- * admin.html
- *
- * Поэтому public/ здесь НЕ используется.
- */
 app.use(
     express.static(__dirname)
 );
@@ -48,11 +37,6 @@ app.use(
 const waitingUsers = new Map();
 const matches = new Map();
 const matchRooms = new Map();
-
-/*
- * userId = постоянный пользователь
- * socketId = конкретная вкладка / сессия
- */
 
 /* =========================
    LIVEKIT STATE
@@ -69,6 +53,9 @@ const REPORTS_FILE =
 
 const BANS_FILE =
     path.join(__dirname, "bans.json");
+
+const STATS_FILE =
+    path.join(__dirname, "stats.json");
 
 /* =========================
    ADMIN
@@ -126,6 +113,348 @@ function randomId(prefix) {
     );
 }
 
+function todayKey() {
+    const date = new Date();
+
+    return (
+        date.getFullYear() +
+        "-" +
+        String(date.getMonth() + 1).padStart(2, "0") +
+        "-" +
+        String(date.getDate()).padStart(2, "0")
+    );
+}
+
+function getDefaultStats() {
+    return {
+        users: {},
+
+        totals: {
+            searchesStarted: 0,
+            searchesMatched: 0,
+            searchesCancelled: 0,
+            searchesTimedOut: 0,
+
+            sessionsCompleted: 0,
+
+            totalCallDurationMs: 0,
+            longestCallDurationMs: 0,
+
+            callsUnder10Seconds: 0
+        },
+
+        daily: {},
+
+        sessions: []
+    };
+}
+
+function readStats() {
+    try {
+        if (!fs.existsSync(STATS_FILE)) {
+            const stats =
+                getDefaultStats();
+
+            writeStats(stats);
+
+            return stats;
+        }
+
+        const data =
+            fs.readFileSync(
+                STATS_FILE,
+                "utf8"
+            );
+
+        const parsed =
+            JSON.parse(data);
+
+        const defaults =
+            getDefaultStats();
+
+        return {
+            ...defaults,
+            ...parsed,
+
+            totals: {
+                ...defaults.totals,
+                ...(parsed.totals || {})
+            },
+
+            daily:
+                parsed.daily || {},
+
+            users:
+                parsed.users || {},
+
+            sessions:
+                Array.isArray(parsed.sessions)
+                    ? parsed.sessions
+                    : []
+        };
+
+    } catch (error) {
+        console.error(
+            "Ошибка чтения stats.json:",
+            error.message
+        );
+
+        return getDefaultStats();
+    }
+}
+
+function writeStats(stats) {
+    try {
+        fs.writeFileSync(
+            STATS_FILE,
+            JSON.stringify(
+                stats,
+                null,
+                2
+            ),
+            "utf8"
+        );
+    } catch (error) {
+        console.error(
+            "Ошибка записи stats.json:",
+            error.message
+        );
+    }
+}
+
+function ensureDailyStats(stats) {
+    const key =
+        todayKey();
+
+    if (!stats.daily[key]) {
+        stats.daily[key] = {
+            searchesStarted: 0,
+            searchesMatched: 0,
+            searchesCancelled: 0,
+            searchesTimedOut: 0,
+            sessionsCompleted: 0
+        };
+    }
+
+    return stats.daily[key];
+}
+
+function recordUser(
+    userId,
+    data = {}
+) {
+    if (!userId) {
+        return;
+    }
+
+    const stats =
+        readStats();
+
+    const now =
+        new Date().toISOString();
+
+    if (!stats.users[userId]) {
+        stats.users[userId] = {
+            firstSeenAt: now,
+            lastSeenAt: now,
+
+            gender:
+                data.gender || null,
+
+            searchGender:
+                data.searchGender || null,
+
+            countryCode:
+                data.countryCode || "UN",
+
+            countryName:
+                data.countryName || "Неизвестно"
+        };
+    } else {
+        const user =
+            stats.users[userId];
+
+        user.lastSeenAt = now;
+
+        if (data.gender) {
+            user.gender =
+                data.gender;
+        }
+
+        if (data.searchGender) {
+            user.searchGender =
+                data.searchGender;
+        }
+
+        if (data.countryCode) {
+            user.countryCode =
+                data.countryCode;
+        }
+
+        if (data.countryName) {
+            user.countryName =
+                data.countryName;
+        }
+    }
+
+    writeStats(stats);
+}
+
+function incrementSearchStarted() {
+    const stats =
+        readStats();
+
+    stats.totals.searchesStarted++;
+
+    const daily =
+        ensureDailyStats(stats);
+
+    daily.searchesStarted++;
+
+    writeStats(stats);
+}
+
+function incrementSearchMatched() {
+    const stats =
+        readStats();
+
+    stats.totals.searchesMatched++;
+
+    const daily =
+        ensureDailyStats(stats);
+
+    daily.searchesMatched++;
+
+    writeStats(stats);
+}
+
+function incrementSearchCancelled() {
+    const stats =
+        readStats();
+
+    stats.totals.searchesCancelled++;
+
+    const daily =
+        ensureDailyStats(stats);
+
+    daily.searchesCancelled++;
+
+    writeStats(stats);
+}
+
+function incrementSearchTimedOut() {
+    const stats =
+        readStats();
+
+    stats.totals.searchesTimedOut++;
+
+    const daily =
+        ensureDailyStats(stats);
+
+    daily.searchesTimedOut++;
+
+    writeStats(stats);
+}
+
+function recordSession(
+    roomName,
+    matchData
+) {
+    if (!matchData) {
+        return;
+    }
+
+    if (matchData.analyticsRecorded) {
+        return;
+    }
+
+    matchData.analyticsRecorded =
+        true;
+
+    const stats =
+        readStats();
+
+    const startedAt =
+        matchData.startedAt ||
+        matchData.createdAt ||
+        Date.now();
+
+    const endedAt =
+        Date.now();
+
+    const durationMs =
+        Math.max(
+            0,
+            endedAt - startedAt
+        );
+
+    stats.totals.sessionsCompleted++;
+
+    stats.totals.totalCallDurationMs +=
+        durationMs;
+
+    if (
+        durationMs >
+        stats.totals.longestCallDurationMs
+    ) {
+        stats.totals.longestCallDurationMs =
+            durationMs;
+    }
+
+    if (
+        durationMs <
+        10 * 1000
+    ) {
+        stats.totals.callsUnder10Seconds++;
+    }
+
+    const daily =
+        ensureDailyStats(stats);
+
+    daily.sessionsCompleted++;
+
+    stats.sessions.push({
+        roomName:
+            roomName,
+
+        startedAt:
+            new Date(
+                startedAt
+            ).toISOString(),
+
+        endedAt:
+            new Date(
+                endedAt
+            ).toISOString(),
+
+        durationMs:
+            durationMs,
+
+        userIds:
+            Array.isArray(
+                matchData.userIds
+            )
+                ? matchData.userIds
+                : []
+    });
+
+    /*
+     * Не даём stats.json бесконечно расти.
+     * Храним последние 5000 разговоров.
+     */
+    if (
+        stats.sessions.length >
+        5000
+    ) {
+        stats.sessions =
+            stats.sessions.slice(
+                -5000
+            );
+    }
+
+    writeStats(stats);
+}
+
 /* =========================
    COOKIES
    ========================= */
@@ -137,21 +466,28 @@ function parseCookies(req) {
     const cookies = {};
 
     header.split(";").forEach(function (part) {
-        const index = part.indexOf("=");
+        const index =
+            part.indexOf("=");
 
         if (index === -1) {
             return;
         }
 
         const key =
-            part.slice(0, index).trim();
+            part.slice(
+                0,
+                index
+            ).trim();
 
         const value =
             decodeURIComponent(
-                part.slice(index + 1).trim()
+                part
+                    .slice(index + 1)
+                    .trim()
             );
 
-        cookies[key] = value;
+        cookies[key] =
+            value;
     });
 
     return cookies;
@@ -168,7 +504,9 @@ function setCookie(
 
     cookie += "; Path=/";
 
-    if (options.httpOnly !== false) {
+    if (
+        options.httpOnly !== false
+    ) {
         cookie += "; HttpOnly";
     }
 
@@ -177,7 +515,9 @@ function setCookie(
             `; SameSite=${options.sameSite}`;
     }
 
-    if (options.maxAge !== undefined) {
+    if (
+        options.maxAge !== undefined
+    ) {
         cookie +=
             `; Max-Age=${options.maxAge}`;
     }
@@ -192,7 +532,10 @@ function setCookie(
     );
 }
 
-function clearCookie(res, name) {
+function clearCookie(
+    res,
+    name
+) {
     res.append(
         "Set-Cookie",
         `${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict`
@@ -203,7 +546,10 @@ function clearCookie(res, name) {
    USER ID
    ========================= */
 
-function ensureUserId(req, res) {
+function ensureUserId(
+    req,
+    res
+) {
     const cookies =
         parseCookies(req);
 
@@ -212,7 +558,9 @@ function ensureUserId(req, res) {
 
     if (
         !userId ||
-        !/^usr_[a-f0-9]{24}$/.test(userId)
+        !/^usr_[a-f0-9]{24}$/.test(
+            userId
+        )
     ) {
         userId =
             randomId("usr_");
@@ -246,7 +594,9 @@ function getUserId(req) {
 
     if (
         !userId ||
-        !/^usr_[a-f0-9]{24}$/.test(userId)
+        !/^usr_[a-f0-9]{24}$/.test(
+            userId
+        )
     ) {
         return null;
     }
@@ -258,7 +608,9 @@ function getUserId(req) {
    JSON STORAGE
    ========================= */
 
-function readJsonArray(file) {
+function readJsonArray(
+    file
+) {
     try {
         if (!fs.existsSync(file)) {
             return [];
@@ -287,7 +639,10 @@ function readJsonArray(file) {
     }
 }
 
-function writeJsonArray(file, data) {
+function writeJsonArray(
+    file,
+    data
+) {
     fs.writeFileSync(
         file,
         JSON.stringify(
@@ -305,7 +660,9 @@ function readReports() {
     );
 }
 
-function writeReports(reports) {
+function writeReports(
+    reports
+) {
     writeJsonArray(
         REPORTS_FILE,
         reports
@@ -318,7 +675,9 @@ function readBans() {
     );
 }
 
-function writeBans(bans) {
+function writeBans(
+    bans
+) {
     writeJsonArray(
         BANS_FILE,
         bans
@@ -329,7 +688,9 @@ function writeBans(bans) {
    BAN CHECK
    ========================= */
 
-function getActiveBan(userId) {
+function getActiveBan(
+    userId
+) {
     if (!userId) {
         return null;
     }
@@ -339,31 +700,41 @@ function getActiveBan(userId) {
 
     let changed = false;
 
-    const now = Date.now();
+    const now =
+        Date.now();
 
     const activeBans =
-        bans.filter(function (ban) {
-            if (
-                ban.expiresAt &&
-                new Date(
-                    ban.expiresAt
-                ).getTime() <= now
-            ) {
-                changed = true;
-                return false;
-            }
+        bans.filter(
+            function (ban) {
+                if (
+                    ban.expiresAt &&
+                    new Date(
+                        ban.expiresAt
+                    ).getTime() <= now
+                ) {
+                    changed = true;
+                    return false;
+                }
 
-            return true;
-        });
+                return true;
+            }
+        );
 
     if (changed) {
-        writeBans(activeBans);
+        writeBans(
+            activeBans
+        );
     }
 
     return (
-        activeBans.find(function (ban) {
-            return ban.userId === userId;
-        }) || null
+        activeBans.find(
+            function (ban) {
+                return (
+                    ban.userId ===
+                    userId
+                );
+            }
+        ) || null
     );
 }
 
@@ -371,7 +742,11 @@ function getActiveBan(userId) {
    ADMIN AUTH
    ========================= */
 
-function requireAdmin(req, res, next) {
+function requireAdmin(
+    req,
+    res,
+    next
+) {
     const cookies =
         parseCookies(req);
 
@@ -380,7 +755,9 @@ function requireAdmin(req, res, next) {
 
     if (
         !sessionId ||
-        !adminSessions.has(sessionId)
+        !adminSessions.has(
+            sessionId
+        )
     ) {
         return res.status(401).json({
             error:
@@ -397,7 +774,9 @@ function requireAdmin(req, res, next) {
 
 function getClientIp(req) {
     const forwarded =
-        req.headers["x-forwarded-for"];
+        req.headers[
+            "x-forwarded-for"
+        ];
 
     if (forwarded) {
         return forwarded
@@ -406,11 +785,16 @@ function getClientIp(req) {
     }
 
     return (
-        req.headers["cf-connecting-ip"] ||
+        req.headers[
+            "cf-connecting-ip"
+        ] ||
         req.socket.remoteAddress ||
         ""
     )
-        .replace("::ffff:", "")
+        .replace(
+            "::ffff:",
+            ""
+        )
         .trim();
 }
 
@@ -419,7 +803,7 @@ function countryName(code) {
         DE: "Германия",
         RU: "Российская федерация",
         US: "США",
-        GB: "Англия",
+        GB: "Великобритания",
         FR: "Франция",
         IT: "Италия",
         ES: "Испания",
@@ -454,9 +838,13 @@ function countryName(code) {
     );
 }
 
-async function getCountry(req) {
+async function getCountry(
+    req
+) {
     if (
-        req.headers["cf-ipcountry"]
+        req.headers[
+            "cf-ipcountry"
+        ]
     ) {
         const code =
             req.headers[
@@ -465,14 +853,21 @@ async function getCountry(req) {
 
         if (code !== "XX") {
             return {
-                code: code,
-                name: countryName(code)
+                code:
+                    code,
+
+                name:
+                    countryName(
+                        code
+                    )
             };
         }
     }
 
     if (
-        req.headers["x-country-code"]
+        req.headers[
+            "x-country-code"
+        ]
     ) {
         const code =
             req.headers[
@@ -480,8 +875,13 @@ async function getCountry(req) {
             ].toUpperCase();
 
         return {
-            code: code,
-            name: countryName(code)
+            code:
+                code,
+
+            name:
+                countryName(
+                    code
+                )
         };
     }
 
@@ -516,14 +916,19 @@ async function getCountry(req) {
 
         const code =
             String(
-                data.country_code || "UN"
+                data.country_code ||
+                "UN"
             ).toUpperCase();
 
         return {
-            code: code,
+            code:
+                code,
+
             name:
                 data.country_name ||
-                countryName(code)
+                countryName(
+                    code
+                )
         };
 
     } catch (error) {
@@ -549,7 +954,9 @@ function registerLiveKitParticipant(
     identity
 ) {
     if (
-        !liveKitParticipants.has(roomName)
+        !liveKitParticipants.has(
+            roomName
+        )
     ) {
         liveKitParticipants.set(
             roomName,
@@ -558,9 +965,13 @@ function registerLiveKitParticipant(
     }
 
     const roomUsers =
-        liveKitParticipants.get(roomName);
+        liveKitParticipants.get(
+            roomName
+        );
 
-    if (!roomUsers.has(userId)) {
+    if (
+        !roomUsers.has(userId)
+    ) {
         roomUsers.set(
             userId,
             new Set()
@@ -577,7 +988,9 @@ function getLiveKitIdentities(
     userId
 ) {
     const roomUsers =
-        liveKitParticipants.get(roomName);
+        liveKitParticipants.get(
+            roomName
+        );
 
     if (!roomUsers) {
         return [];
@@ -590,7 +1003,9 @@ function getLiveKitIdentities(
         return [];
     }
 
-    return Array.from(identities);
+    return Array.from(
+        identities
+    );
 }
 
 function removeTrackedIdentity(
@@ -599,27 +1014,41 @@ function removeTrackedIdentity(
     identity
 ) {
     const roomUsers =
-        liveKitParticipants.get(roomName);
+        liveKitParticipants.get(
+            roomName
+        );
 
     if (!roomUsers) {
         return;
     }
 
     const identities =
-        roomUsers.get(userId);
+        roomUsers.get(
+            userId
+        );
 
     if (!identities) {
         return;
     }
 
-    identities.delete(identity);
+    identities.delete(
+        identity
+    );
 
-    if (identities.size === 0) {
-        roomUsers.delete(userId);
+    if (
+        identities.size === 0
+    ) {
+        roomUsers.delete(
+            userId
+        );
     }
 
-    if (roomUsers.size === 0) {
-        liveKitParticipants.delete(roomName);
+    if (
+        roomUsers.size === 0
+    ) {
+        liveKitParticipants.delete(
+            roomName
+        );
     }
 }
 
@@ -641,11 +1070,16 @@ async function kickUserFromRoom(
             userId
         );
 
-    if (identities.length === 0) {
+    if (
+        identities.length === 0
+    ) {
         return;
     }
 
-    for (const identity of identities) {
+    for (
+        const identity
+        of identities
+    ) {
         try {
             await liveKitRoomService
                 .removeParticipant(
@@ -678,7 +1112,10 @@ async function kickUserFromRoom(
 
 app.get(
     "/api/livekit-token",
-    async function (req, res) {
+    async function (
+        req,
+        res
+    ) {
         try {
             const room =
                 req.query.room;
@@ -697,14 +1134,18 @@ app.get(
                 );
 
             const ban =
-                getActiveBan(userId);
+                getActiveBan(
+                    userId
+                );
 
             if (ban) {
                 return res.status(403).json({
                     error:
                         "USER_BANNED",
+
                     reason:
                         ban.reason,
+
                     expiresAt:
                         ban.expiresAt
                 });
@@ -727,8 +1168,11 @@ app.get(
                 );
 
             token.addGrant({
-                roomJoin: true,
-                room: room
+                roomJoin:
+                    true,
+
+                room:
+                    room
             });
 
             const jwt =
@@ -740,10 +1184,32 @@ app.get(
                 identity
             );
 
+            /*
+             * Если это реальный матч,
+             * считаем момент первого
+             * получения LiveKit token
+             * началом разговора.
+             */
+            const matchData =
+                matchRooms.get(
+                    room
+                );
+
+            if (
+                matchData &&
+                !matchData.startedAt
+            ) {
+                matchData.startedAt =
+                    Date.now();
+            }
+
             return res.json({
-                token: jwt,
+                token:
+                    jwt,
+
                 url:
                     process.env.LIVEKIT_URL,
+
                 identity:
                     identity
             });
@@ -768,7 +1234,10 @@ app.get(
 
 app.post(
     "/api/match/start",
-    async function (req, res) {
+    async function (
+        req,
+        res
+    ) {
         try {
             const userId =
                 ensureUserId(
@@ -777,14 +1246,18 @@ app.post(
                 );
 
             const ban =
-                getActiveBan(userId);
+                getActiveBan(
+                    userId
+                );
 
             if (ban) {
                 return res.status(403).json({
                     error:
                         "USER_BANNED",
+
                     reason:
                         ban.reason,
+
                     expiresAt:
                         ban.expiresAt
                 });
@@ -798,7 +1271,8 @@ app.post(
 
             if (
                 !socketId ||
-                typeof socketId !== "string"
+                typeof socketId !==
+                    "string"
             ) {
                 return res.status(400).json({
                     error:
@@ -808,7 +1282,8 @@ app.post(
 
             if (
                 !gender ||
-                typeof gender !== "string"
+                typeof gender !==
+                    "string"
             ) {
                 return res.status(400).json({
                     error:
@@ -822,17 +1297,54 @@ app.post(
                     ? searchGender
                     : "any";
 
-            waitingUsers.delete(socketId);
-            matches.delete(socketId);
+            waitingUsers.delete(
+                socketId
+            );
+
+            matches.delete(
+                socketId
+            );
+
+            /*
+             * Статистика пользователя.
+             */
+            const country =
+                await getCountry(
+                    req
+                );
+
+            recordUser(
+                userId,
+                {
+                    gender:
+                        gender,
+
+                    searchGender:
+                        normalizedSearchGender,
+
+                    countryCode:
+                        country.code,
+
+                    countryName:
+                        country.name
+                }
+            );
+
+            incrementSearchStarted();
 
             let matchedId = null;
             let matchedUser = null;
 
             for (
-                const [id, user]
-                of waitingUsers
+                const [
+                    id,
+                    user
+                ]
+                    of waitingUsers
             ) {
-                if (id === socketId) {
+                if (
+                    id === socketId
+                ) {
                     continue;
                 }
 
@@ -864,8 +1376,12 @@ app.post(
                     continue;
                 }
 
-                matchedId = id;
-                matchedUser = user;
+                matchedId =
+                    id;
+
+                matchedUser =
+                    user;
+
                 break;
             }
 
@@ -885,25 +1401,6 @@ app.post(
                         .randomBytes(4)
                         .toString("hex");
 
-                const currentUserCountry =
-                    await getCountry(req);
-
-                matches.set(
-                    matchedId,
-                    {
-                        roomName:
-                            roomName,
-
-                        peer: {
-                            gender:
-                                gender,
-
-                            country:
-                                currentUserCountry
-                        }
-                    }
-                );
-
                 const matchRoom = {
                     users: [
                         matchedId,
@@ -921,13 +1418,40 @@ app.post(
                     ],
 
                     endedFor:
-                        new Set()
+                        new Set(),
+
+                    createdAt:
+                        Date.now(),
+
+                    startedAt:
+                        null,
+
+                    analyticsRecorded:
+                        false
                 };
 
                 matchRooms.set(
                     roomName,
                     matchRoom
                 );
+
+                matches.set(
+                    matchedId,
+                    {
+                        roomName:
+                            roomName,
+
+                        peer: {
+                            gender:
+                                gender,
+
+                            country:
+                                country
+                        }
+                    }
+                );
+
+                incrementSearchMatched();
 
                 return res.json({
                     status:
@@ -945,9 +1469,6 @@ app.post(
                     }
                 });
             }
-
-            const country =
-                await getCountry(req);
 
             waitingUsers.set(
                 socketId,
@@ -997,7 +1518,10 @@ app.post(
 
 app.get(
     "/api/match/check",
-    function (req, res) {
+    function (
+        req,
+        res
+    ) {
         const socketId =
             req.query.socketId;
 
@@ -1027,7 +1551,8 @@ app.get(
                 matchData.users.find(
                     function (id) {
                         return (
-                            id !== socketId
+                            id !==
+                            socketId
                         );
                     }
                 );
@@ -1061,7 +1586,9 @@ app.get(
         }
 
         const match =
-            matches.get(socketId);
+            matches.get(
+                socketId
+            );
 
         if (!match) {
             return res.json({
@@ -1070,7 +1597,9 @@ app.get(
             });
         }
 
-        matches.delete(socketId);
+        matches.delete(
+            socketId
+        );
 
         return res.json({
             status:
@@ -1091,7 +1620,10 @@ app.get(
 
 app.post(
     "/api/match/stop",
-    function (req, res) {
+    function (
+        req,
+        res
+    ) {
         const {
             socketId
         } = req.body;
@@ -1103,8 +1635,36 @@ app.post(
             });
         }
 
-        waitingUsers.delete(socketId);
-        matches.delete(socketId);
+        /*
+         * Если пользователь был именно
+         * в очереди ожидания — считаем
+         * отменённым поиском.
+         */
+        const waitingUser =
+            waitingUsers.get(
+                socketId
+            );
+
+        if (waitingUser) {
+            waitingUsers.delete(
+                socketId
+            );
+
+            matches.delete(
+                socketId
+            );
+
+            incrementSearchCancelled();
+
+            return res.json({
+                status:
+                    "stopped"
+            });
+        }
+
+        matches.delete(
+            socketId
+        );
 
         for (
             const [
@@ -1126,8 +1686,14 @@ app.post(
             );
 
             if (
-                matchData.endedFor.size >= 2
+                matchData.endedFor.size >=
+                2
             ) {
+                recordSession(
+                    roomName,
+                    matchData
+                );
+
                 matchRooms.delete(
                     roomName
                 );
@@ -1153,10 +1719,15 @@ app.post(
 
 app.post(
     "/api/report",
-    function (req, res) {
+    function (
+        req,
+        res
+    ) {
         try {
             const reporterId =
-                getUserId(req);
+                getUserId(
+                    req
+                );
 
             if (!reporterId) {
                 return res.status(400).json({
@@ -1176,7 +1747,8 @@ app.post(
 
             if (
                 !reason ||
-                typeof reason !== "string"
+                typeof reason !==
+                    "string"
             ) {
                 return res.status(400).json({
                     error:
@@ -1186,7 +1758,8 @@ app.post(
 
             if (
                 !roomName ||
-                typeof roomName !== "string"
+                typeof roomName !==
+                    "string"
             ) {
                 return res.status(400).json({
                     error:
@@ -1195,7 +1768,9 @@ app.post(
             }
 
             const matchData =
-                matchRooms.get(roomName);
+                matchRooms.get(
+                    roomName
+                );
 
             if (!matchData) {
                 return res.status(400).json({
@@ -1209,7 +1784,10 @@ app.post(
                     reporterId
                 );
 
-            if (reporterIndex === -1) {
+            if (
+                reporterIndex ===
+                -1
+            ) {
                 return res.status(403).json({
                     error:
                         "You are not a member of this room"
@@ -1236,30 +1814,46 @@ app.post(
             const cleanReason =
                 reason
                     .trim()
-                    .substring(0, 200);
+                    .substring(
+                        0,
+                        200
+                    );
 
             const cleanDetails =
-                typeof details === "string"
+                typeof details ===
+                    "string"
                     ? details
                         .trim()
-                        .substring(0, 1000)
+                        .substring(
+                            0,
+                            1000
+                        )
                     : "";
 
-            let safeChatHistory = [];
+            let safeChatHistory =
+                [];
 
             if (
-                Array.isArray(chatHistory)
+                Array.isArray(
+                    chatHistory
+                )
             ) {
                 safeChatHistory =
                     chatHistory
-                        .slice(0, 1000)
+                        .slice(
+                            0,
+                            1000
+                        )
                         .map(
-                            function (item) {
+                            function (
+                                item
+                            ) {
                                 return {
                                     side:
                                         item &&
                                         (
-                                            item.side === "Вы" ||
+                                            item.side ===
+                                                "Вы" ||
                                             item.side ===
                                                 "Собеседник"
                                         )
@@ -1288,14 +1882,17 @@ app.post(
                         );
             }
 
-            let safeEvidenceImage = null;
+            let safeEvidenceImage =
+                null;
 
             if (
-                typeof evidenceImage === "string" &&
+                typeof evidenceImage ===
+                    "string" &&
                 evidenceImage.startsWith(
                     "data:image/"
                 ) &&
-                evidenceImage.length <= 3000000
+                evidenceImage.length <=
+                    3000000
             ) {
                 safeEvidenceImage =
                     evidenceImage;
@@ -1306,7 +1903,9 @@ app.post(
 
             const duplicate =
                 reports.find(
-                    function (report) {
+                    function (
+                        report
+                    ) {
                         return (
                             report.reporterId ===
                                 reporterId &&
@@ -1332,7 +1931,9 @@ app.post(
 
             const report = {
                 id:
-                    randomId("report_"),
+                    randomId(
+                        "report_"
+                    ),
 
                 reason:
                     cleanReason,
@@ -1378,9 +1979,13 @@ app.post(
                     safeChatHistory
             };
 
-            reports.push(report);
+            reports.push(
+                report
+            );
 
-            writeReports(reports);
+            writeReports(
+                reports
+            );
 
             console.log(
                 "Новая жалоба:",
@@ -1415,7 +2020,10 @@ app.post(
 
 app.post(
     "/api/admin/login",
-    function (req, res) {
+    function (
+        req,
+        res
+    ) {
         if (!ADMIN_PASSWORD) {
             return res.status(500).json({
                 error:
@@ -1440,7 +2048,9 @@ app.post(
         }
 
         const sessionId =
-            randomId("adm_");
+            randomId(
+                "adm_"
+            );
 
         adminSessions.set(
             sessionId,
@@ -1455,8 +2065,12 @@ app.post(
             "icechat_admin",
             sessionId,
             {
-                httpOnly: true,
-                sameSite: "Strict",
+                httpOnly:
+                    true,
+
+                sameSite:
+                    "Strict",
+
                 maxAge:
                     60 *
                     60 *
@@ -1478,9 +2092,14 @@ app.post(
 app.post(
     "/api/admin/logout",
     requireAdmin,
-    function (req, res) {
+    function (
+        req,
+        res
+    ) {
         const cookies =
-            parseCookies(req);
+            parseCookies(
+                req
+            );
 
         adminSessions.delete(
             cookies.icechat_admin
@@ -1505,7 +2124,10 @@ app.post(
 app.get(
     "/api/admin/me",
     requireAdmin,
-    function (req, res) {
+    function (
+        req,
+        res
+    ) {
         return res.json({
             status:
                 "ok"
@@ -1520,18 +2142,26 @@ app.get(
 app.get(
     "/api/admin/reports",
     requireAdmin,
-    function (req, res) {
+    function (
+        req,
+        res
+    ) {
         const reports =
             readReports();
 
         reports.sort(
-            function (a, b) {
+            function (
+                a,
+                b
+            ) {
                 return (
                     new Date(
-                        b.createdAt || 0
+                        b.createdAt ||
+                            0
                     ).getTime() -
                     new Date(
-                        a.createdAt || 0
+                        a.createdAt ||
+                            0
                     ).getTime()
                 );
             }
@@ -1551,7 +2181,10 @@ app.get(
 app.post(
     "/api/admin/reports/:reportId/action",
     requireAdmin,
-    async function (req, res) {
+    async function (
+        req,
+        res
+    ) {
         try {
             const reportId =
                 req.params.reportId;
@@ -1567,7 +2200,9 @@ app.post(
 
             const report =
                 reports.find(
-                    function (item) {
+                    function (
+                        item
+                    ) {
                         return (
                             item.id ===
                             reportId
@@ -1583,15 +2218,20 @@ app.post(
             }
 
             const cleanNote =
-                typeof note === "string"
+                typeof note ===
+                    "string"
                     ? note
                         .trim()
-                        .substring(0, 1000)
+                        .substring(
+                            0,
+                            1000
+                        )
                     : "";
 
-            /* REJECT */
-
-            if (action === "reject") {
+            if (
+                action ===
+                "reject"
+            ) {
                 report.status =
                     "rejected";
 
@@ -1601,7 +2241,9 @@ app.post(
                 report.reviewedAt =
                     new Date().toISOString();
 
-                writeReports(reports);
+                writeReports(
+                    reports
+                );
 
                 return res.json({
                     status:
@@ -1609,9 +2251,10 @@ app.post(
                 });
             }
 
-            /* WARNING */
-
-            if (action === "warn") {
+            if (
+                action ===
+                "warn"
+            ) {
                 report.status =
                     "warning";
 
@@ -1621,7 +2264,9 @@ app.post(
                 report.reviewedAt =
                     new Date().toISOString();
 
-                writeReports(reports);
+                writeReports(
+                    reports
+                );
 
                 return res.json({
                     status:
@@ -1629,10 +2274,13 @@ app.post(
                 });
             }
 
-            /* BAN */
-
-            if (action === "ban") {
-                if (!report.targetUserId) {
+            if (
+                action ===
+                "ban"
+            ) {
+                if (
+                    !report.targetUserId
+                ) {
                     return res.status(400).json({
                         error:
                             "В этой старой жалобе нет ID нарушителя. Новые жалобы будут содержать его автоматически."
@@ -1644,7 +2292,9 @@ app.post(
 
                 const existingIndex =
                     bans.findIndex(
-                        function (ban) {
+                        function (
+                            ban
+                        ) {
                             return (
                                 ban.userId ===
                                 report.targetUserId
@@ -1652,20 +2302,25 @@ app.post(
                         }
                     );
 
-                let expiresAt = null;
+                let expiresAt =
+                    null;
 
                 if (
-                    duration === "minute"
+                    duration ===
+                    "minute"
                 ) {
                     expiresAt =
                         new Date(
                             Date.now() +
-                            60 * 1000
+                            60 *
+                            1000
                         ).toISOString();
 
                 } else if (
-                    duration === "1day" ||
-                    duration === "24"
+                    duration ===
+                        "1day" ||
+                    duration ===
+                        "24"
                 ) {
                     expiresAt =
                         new Date(
@@ -1678,7 +2333,8 @@ app.post(
                         ).toISOString();
 
                 } else if (
-                    duration === "3days"
+                    duration ===
+                    "3days"
                 ) {
                     expiresAt =
                         new Date(
@@ -1691,7 +2347,8 @@ app.post(
                         ).toISOString();
 
                 } else if (
-                    duration === "7days"
+                    duration ===
+                    "7days"
                 ) {
                     expiresAt =
                         new Date(
@@ -1704,7 +2361,8 @@ app.post(
                         ).toISOString();
 
                 } else if (
-                    duration === "30days"
+                    duration ===
+                    "30days"
                 ) {
                     expiresAt =
                         new Date(
@@ -1717,12 +2375,15 @@ app.post(
                         ).toISOString();
 
                 } else if (
-                    duration === "permanent"
+                    duration ===
+                    "permanent"
                 ) {
-                    expiresAt = null;
+                    expiresAt =
+                        null;
 
                 } else if (
-                    typeof duration === "number"
+                    typeof duration ===
+                    "number"
                 ) {
                     if (
                         !Number.isFinite(
@@ -1775,15 +2436,21 @@ app.post(
                 };
 
                 if (
-                    existingIndex !== -1
+                    existingIndex !==
+                    -1
                 ) {
-                    bans[existingIndex] =
-                        ban;
+                    bans[
+                        existingIndex
+                    ] = ban;
                 } else {
-                    bans.push(ban);
+                    bans.push(
+                        ban
+                    );
                 }
 
-                writeBans(bans);
+                writeBans(
+                    bans
+                );
 
                 report.status =
                     "banned";
@@ -1794,9 +2461,9 @@ app.post(
                 report.reviewedAt =
                     new Date().toISOString();
 
-                writeReports(reports);
-
-                /* REMOVE FROM MATCHING QUEUE */
+                writeReports(
+                    reports
+                );
 
                 for (
                     const [
@@ -1819,9 +2486,8 @@ app.post(
                     }
                 }
 
-                /* KICK FROM LIVEKIT */
-
-                let kickedCount = 0;
+                let kickedCount =
+                    0;
 
                 for (
                     const [
@@ -1849,13 +2515,18 @@ app.post(
                             report.targetUserId
                         );
 
-                    if (targetIndex !== -1) {
+                    if (
+                        targetIndex !==
+                        -1
+                    ) {
                         const targetSocket =
                             matchData.users[
                                 targetIndex
                             ];
 
-                        if (targetSocket) {
+                        if (
+                            targetSocket
+                        ) {
                             matchData.endedFor.add(
                                 targetSocket
                             );
@@ -1903,7 +2574,10 @@ app.post(
 app.get(
     "/api/admin/bans",
     requireAdmin,
-    function (req, res) {
+    function (
+        req,
+        res
+    ) {
         const bans =
             readBans();
 
@@ -1912,12 +2586,15 @@ app.get(
 
         const activeBans =
             bans.filter(
-                function (ban) {
+                function (
+                    ban
+                ) {
                     if (
                         ban.expiresAt &&
                         new Date(
                             ban.expiresAt
-                        ).getTime() <= now
+                        ).getTime() <=
+                            now
                     ) {
                         return false;
                     }
@@ -1930,7 +2607,9 @@ app.get(
             activeBans.length !==
             bans.length
         ) {
-            writeBans(activeBans);
+            writeBans(
+                activeBans
+            );
         }
 
         return res.json({
@@ -1947,7 +2626,10 @@ app.get(
 app.post(
     "/api/admin/bans/:userId/unban",
     requireAdmin,
-    function (req, res) {
+    function (
+        req,
+        res
+    ) {
         const userId =
             req.params.userId;
 
@@ -1956,7 +2638,9 @@ app.post(
 
         const updated =
             bans.filter(
-                function (ban) {
+                function (
+                    ban
+                ) {
                     return (
                         ban.userId !==
                         userId
@@ -1964,7 +2648,9 @@ app.post(
                 }
             );
 
-        writeBans(updated);
+        writeBans(
+            updated
+        );
 
         return res.json({
             status:
@@ -1974,12 +2660,648 @@ app.post(
 );
 
 /* =========================
+   ADMIN STATISTICS
+   ========================= */
+
+app.get(
+    "/api/admin/stats",
+    requireAdmin,
+    function (
+        req,
+        res
+    ) {
+        try {
+            const stats =
+                readStats();
+
+            const now =
+                Date.now();
+
+            const users =
+                Object.values(
+                    stats.users || {}
+                );
+
+            const totalUsers =
+                users.length;
+
+            const dayMs =
+                24 *
+                60 *
+                60 *
+                1000;
+
+            const todayStart =
+                new Date();
+
+            todayStart.setHours(
+                0,
+                0,
+                0,
+                0
+            );
+
+            const todayTimestamp =
+                todayStart.getTime();
+
+            const sevenDaysAgo =
+                now -
+                7 *
+                dayMs;
+
+            const thirtyDaysAgo =
+                now -
+                30 *
+                dayMs;
+
+            const newToday =
+                users.filter(
+                    function (
+                        user
+                    ) {
+                        return (
+                            new Date(
+                                user.firstSeenAt
+                            ).getTime() >=
+                            todayTimestamp
+                        );
+                    }
+                ).length;
+
+            const new7Days =
+                users.filter(
+                    function (
+                        user
+                    ) {
+                        return (
+                            new Date(
+                                user.firstSeenAt
+                            ).getTime() >=
+                            sevenDaysAgo
+                        );
+                    }
+                ).length;
+
+            const new30Days =
+                users.filter(
+                    function (
+                        user
+                    ) {
+                        return (
+                            new Date(
+                                user.firstSeenAt
+                            ).getTime() >=
+                            thirtyDaysAgo
+                        );
+                    }
+                ).length;
+
+            /*
+             * Активные пользователи.
+             *
+             * Это пользователи, которые прямо сейчас
+             * находятся в поиске, матче или LiveKit.
+             */
+            const activeUserIds =
+                new Set();
+
+            const searchingUserIds =
+                new Set();
+
+            const inCallUserIds =
+                new Set();
+
+            for (
+                const user
+                of waitingUsers.values()
+            ) {
+                if (user.userId) {
+                    activeUserIds.add(
+                        user.userId
+                    );
+
+                    searchingUserIds.add(
+                        user.userId
+                    );
+                }
+            }
+
+            for (
+                const matchData
+                of matchRooms.values()
+            ) {
+                if (
+                    Array.isArray(
+                        matchData.userIds
+                    )
+                ) {
+                    for (
+                        const userId
+                        of matchData.userIds
+                    ) {
+                        if (userId) {
+                            activeUserIds.add(
+                                userId
+                            );
+
+                            inCallUserIds.add(
+                                userId
+                            );
+                        }
+                    }
+                }
+            }
+
+            for (
+                const roomUsers
+                of liveKitParticipants.values()
+            ) {
+                for (
+                    const userId
+                    of roomUsers.keys()
+                ) {
+                    if (userId) {
+                        activeUserIds.add(
+                            userId
+                        );
+
+                        inCallUserIds.add(
+                            userId
+                        );
+                    }
+                }
+            }
+
+            /*
+             * Страны.
+             */
+            const countries =
+                {};
+
+            const activeCountries =
+                {};
+
+            users.forEach(
+                function (
+                    user
+                ) {
+                    const name =
+                        user.countryName ||
+                        "Неизвестно";
+
+                    countries[name] =
+                        (
+                            countries[name] ||
+                            0
+                        ) + 1;
+                }
+            );
+
+            users.forEach(
+                function (
+                    user
+                ) {
+                    /*
+                     * Здесь lastSeenAt используется
+                     * только для сохранённой статистики.
+                     * Реальный online считается выше
+                     * по текущим state Map.
+                     */
+                    if (
+                        activeUserIds.has(
+                            Object.keys(
+                                stats.users
+                            ).find(
+                                function (
+                                    id
+                                ) {
+                                    return (
+                                        stats.users[id] ===
+                                        user
+                                    );
+                                }
+                            )
+                        )
+                    ) {
+                        const name =
+                            user.countryName ||
+                            "Неизвестно";
+
+                        activeCountries[name] =
+                            (
+                                activeCountries[name] ||
+                                0
+                            ) + 1;
+                    }
+                }
+            );
+
+            /*
+             * Более быстрый и точный подсчёт
+             * активных стран.
+             */
+            Object.keys(
+                stats.users
+            ).forEach(
+                function (
+                    userId
+                ) {
+                    if (
+                        !activeUserIds.has(
+                            userId
+                        )
+                    ) {
+                        return;
+                    }
+
+                    const user =
+                        stats.users[
+                            userId
+                        ];
+
+                    const name =
+                        user.countryName ||
+                        "Неизвестно";
+
+                    activeCountries[name] =
+                        (
+                            activeCountries[name] ||
+                            0
+                        ) + 1;
+                }
+            );
+
+            /*
+             * Пол.
+             */
+            const genders = {
+                male: 0,
+                female: 0,
+                unknown: 0
+            };
+
+            const searchGenders = {
+                male: 0,
+                female: 0,
+                any: 0
+            };
+
+            users.forEach(
+                function (
+                    user
+                ) {
+                    if (
+                        user.gender ===
+                        "male"
+                    ) {
+                        genders.male++;
+                    } else if (
+                        user.gender ===
+                        "female"
+                    ) {
+                        genders.female++;
+                    } else {
+                        genders.unknown++;
+                    }
+
+                    if (
+                        user.searchGender ===
+                        "male"
+                    ) {
+                        searchGenders.male++;
+                    } else if (
+                        user.searchGender ===
+                        "female"
+                    ) {
+                        searchGenders.female++;
+                    } else {
+                        searchGenders.any++;
+                    }
+                }
+            );
+
+            const totals =
+                stats.totals || {};
+
+            const searchesStarted =
+                Number(
+                    totals.searchesStarted ||
+                    0
+                );
+
+            const searchesMatched =
+                Number(
+                    totals.searchesMatched ||
+                    0
+                );
+
+            const searchesCancelled =
+                Number(
+                    totals.searchesCancelled ||
+                    0
+                );
+
+            const searchesTimedOut =
+                Number(
+                    totals.searchesTimedOut ||
+                    0
+                );
+
+            const sessionsCompleted =
+                Number(
+                    totals.sessionsCompleted ||
+                    0
+                );
+
+            const totalDurationMs =
+                Number(
+                    totals.totalCallDurationMs ||
+                    0
+                );
+
+            const longestDurationMs =
+                Number(
+                    totals.longestCallDurationMs ||
+                    0
+                );
+
+            const averageDurationMs =
+                sessionsCompleted > 0
+                    ? Math.round(
+                        totalDurationMs /
+                        sessionsCompleted
+                    )
+                    : 0;
+
+            const matchSuccessRate =
+                searchesStarted > 0
+                    ? Number(
+                        (
+                            searchesMatched /
+                            searchesStarted *
+                            100
+                        ).toFixed(1)
+                    )
+                    : 0;
+
+            /*
+             * Модерация.
+             */
+            const reports =
+                readReports();
+
+            const bans =
+                readBans();
+
+            const reportStats = {
+                total:
+                    reports.length,
+
+                new:
+                    reports.filter(
+                        function (
+                            report
+                        ) {
+                            return (
+                                report.status ===
+                                "new"
+                            );
+                        }
+                    ).length,
+
+                rejected:
+                    reports.filter(
+                        function (
+                            report
+                        ) {
+                            return (
+                                report.status ===
+                                "rejected"
+                            );
+                        }
+                    ).length,
+
+                warnings:
+                    reports.filter(
+                        function (
+                            report
+                        ) {
+                            return (
+                                report.status ===
+                                "warning"
+                            );
+                        }
+                    ).length,
+
+                banned:
+                    reports.filter(
+                        function (
+                            report
+                        ) {
+                            return (
+                                report.status ===
+                                "banned"
+                            );
+                        }
+                    ).length
+            };
+
+            const activeBans =
+                bans.filter(
+                    function (
+                        ban
+                    ) {
+                        if (
+                            !ban.expiresAt
+                        ) {
+                            return true;
+                        }
+
+                        return (
+                            new Date(
+                                ban.expiresAt
+                            ).getTime() >
+                            now
+                        );
+                    }
+                );
+
+            /*
+             * Последние 30 дней по дням.
+             */
+            const daily =
+                {};
+
+            Object.keys(
+                stats.daily || {}
+            )
+                .sort()
+                .slice(-30)
+                .forEach(
+                    function (
+                        date
+                    ) {
+                        daily[date] =
+                            stats.daily[
+                                date
+                            ];
+                    }
+                );
+
+            return res.json({
+                status:
+                    "ok",
+
+                generatedAt:
+                    new Date().toISOString(),
+
+                users: {
+                    total:
+                        totalUsers,
+
+                    online:
+                        activeUserIds.size,
+
+                    searching:
+                        searchingUserIds.size,
+
+                    inCall:
+                        inCallUserIds.size,
+
+                    newToday:
+                        newToday,
+
+                    new7Days:
+                        new7Days,
+
+                    new30Days:
+                        new30Days
+                },
+
+                matching: {
+                    searchesStarted:
+                        searchesStarted,
+
+                    searchesMatched:
+                        searchesMatched,
+
+                    searchesCancelled:
+                        searchesCancelled,
+
+                    searchesTimedOut:
+                        searchesTimedOut,
+
+                    matchSuccessRate:
+                        matchSuccessRate
+                },
+
+                calls: {
+                    total:
+                        sessionsCompleted,
+
+                    averageDurationMs:
+                        averageDurationMs,
+
+                    longestDurationMs:
+                        longestDurationMs,
+
+                    callsUnder10Seconds:
+                        Number(
+                            totals.callsUnder10Seconds ||
+                            0
+                        )
+                },
+
+                countries:
+                    countries,
+
+                activeCountries:
+                    activeCountries,
+
+                genders:
+                    genders,
+
+                searchGenders:
+                    searchGenders,
+
+                moderation:
+                    {
+                        reports:
+                            reportStats,
+
+                        activeBans:
+                            activeBans.length,
+
+                        totalBans:
+                            bans.length
+                    },
+
+                technical: {
+                    uptimeSeconds:
+                        Math.floor(
+                            process.uptime()
+                        ),
+
+                    memory: {
+                        rss:
+                            process.memoryUsage()
+                                .rss,
+
+                        heapUsed:
+                            process.memoryUsage()
+                                .heapUsed,
+
+                        heapTotal:
+                            process.memoryUsage()
+                                .heapTotal
+                    },
+
+                    waiting:
+                        waitingUsers.size,
+
+                    matches:
+                        matches.size,
+
+                    rooms:
+                        matchRooms.size,
+
+                    livekitRooms:
+                        liveKitParticipants.size,
+
+                    livekitEnabled:
+                        Boolean(
+                            liveKitRoomService
+                        )
+                },
+
+                daily:
+                    daily
+            });
+
+        } catch (error) {
+            console.error(
+                "Admin stats error:",
+                error
+            );
+
+            return res.status(500).json({
+                error:
+                    "Failed to load statistics"
+            });
+        }
+    }
+);
+
+/* =========================
    ADMIN PAGE
    ========================= */
 
 app.get(
     "/admin",
-    function (req, res) {
+    function (
+        req,
+        res
+    ) {
         return res.sendFile(
             path.join(
                 __dirname,
@@ -1995,7 +3317,10 @@ app.get(
 
 app.get(
     "/",
-    function (req, res) {
+    function (
+        req,
+        res
+    ) {
         return res.sendFile(
             path.join(
                 __dirname,
@@ -2011,7 +3336,10 @@ app.get(
 
 app.get(
     "/api/match/status",
-    function (req, res) {
+    function (
+        req,
+        res
+    ) {
         return res.json({
             waiting:
                 waitingUsers.size,
@@ -2029,7 +3357,7 @@ app.get(
 );
 
 /* =========================
-   CLEANUP
+   CLEANUP WAITING USERS
    ========================= */
 
 setInterval(
@@ -2062,11 +3390,20 @@ setInterval(
                 matches.delete(
                     socketId
                 );
+
+                /*
+                 * Поиск закончился таймаутом.
+                 */
+                incrementSearchTimedOut();
             }
         }
     },
     30 * 1000
 );
+
+/* =========================
+   CLEANUP LIVEKIT TRACKING
+   ========================= */
 
 setInterval(
     function () {
@@ -2091,18 +3428,64 @@ setInterval(
 );
 
 /* =========================
+   ADMIN SESSION CLEANUP
+   ========================= */
+
+setInterval(
+    function () {
+        const now =
+            Date.now();
+
+        const MAX_SESSION =
+            12 *
+            60 *
+            60 *
+            1000;
+
+        for (
+            const [
+                sessionId,
+                session
+            ]
+                of adminSessions
+        ) {
+            if (
+                !session.createdAt ||
+                now -
+                    session.createdAt >
+                    MAX_SESSION
+            ) {
+                adminSessions.delete(
+                    sessionId
+                );
+            }
+        }
+    },
+    30 * 60 * 1000
+);
+
+/* =========================
    ERROR HANDLER
    ========================= */
 
 app.use(
-    function (err, req, res, next) {
+    function (
+        err,
+        req,
+        res,
+        next
+    ) {
         console.error(
             "Express error:",
             err
         );
 
-        if (res.headersSent) {
-            return next(err);
+        if (
+            res.headersSent
+        ) {
+            return next(
+                err
+            );
         }
 
         return res.status(500).json({
@@ -2124,13 +3507,21 @@ server.listen(
             `IceChat запущен на порту ${PORT}`
         );
 
+        /*
+         * Создаём stats.json сразу
+         * при запуске, если его нет.
+         */
+        readStats();
+
         if (!ADMIN_PASSWORD) {
             console.warn(
                 "ВНИМАНИЕ: ADMIN_PASSWORD не задан в Render Environment Variables"
             );
         }
 
-        if (liveKitRoomService) {
+        if (
+            liveKitRoomService
+        ) {
             console.log(
                 "LiveKit moderation: ON"
             );
@@ -2146,6 +3537,10 @@ server.listen(
 
         console.log(
             "Баны: 1м / 1д / 3д / 7д / 30д / навсегда"
+        );
+
+        console.log(
+            "Статистика: ON"
         );
     }
 );
