@@ -551,6 +551,314 @@
             font-weight: 700;
         }
 
+        /* =========================
+           STATISTICS
+        ========================= */
+
+        .stats-header {
+            display: flex;
+
+            align-items: center;
+            justify-content: space-between;
+
+            gap: 12px;
+
+            margin-bottom: 16px;
+
+            flex-wrap: wrap;
+        }
+
+        .stats-title {
+            font-size: 20px;
+            font-weight: 800;
+        }
+
+        .stats-updated {
+            margin-top: 4px;
+
+            color: #71889f;
+
+            font-size: 11px;
+        }
+
+        .stats-grid {
+            display: grid;
+
+            grid-template-columns:
+                repeat(4, minmax(0, 1fr));
+
+            gap: 10px;
+        }
+
+        .stat-card {
+            min-height: 105px;
+
+            padding: 14px;
+
+            border-radius: 16px;
+
+            border:
+                1px solid
+                rgba(255,255,255,0.07);
+
+            background:
+                rgba(0,0,0,0.18);
+
+            display: flex;
+
+            flex-direction: column;
+
+            justify-content: space-between;
+        }
+
+        .stat-icon {
+            font-size: 20px;
+        }
+
+        .stat-value {
+            margin-top: 7px;
+
+            font-size: 25px;
+            font-weight: 800;
+
+            line-height: 1.05;
+        }
+
+        .stat-label {
+            margin-top: 5px;
+
+            color: #91abc2;
+
+            font-size: 11px;
+        }
+
+        .stats-columns {
+            display: grid;
+
+            grid-template-columns:
+                1fr 1fr;
+
+            gap: 14px;
+
+            margin-top: 14px;
+        }
+
+        .stats-box {
+            padding: 15px;
+
+            border-radius: 16px;
+
+            border:
+                1px solid
+                rgba(255,255,255,0.07);
+
+            background:
+                rgba(0,0,0,0.18);
+        }
+
+        .stats-box-title {
+            margin-bottom: 13px;
+
+            font-size: 15px;
+            font-weight: 800;
+        }
+
+        .stats-list {
+            display: grid;
+
+            gap: 9px;
+        }
+
+        .stats-row {
+            display: flex;
+
+            align-items: center;
+            justify-content: space-between;
+
+            gap: 10px;
+
+            padding:
+                9px 10px;
+
+            border-radius: 10px;
+
+            background:
+                rgba(255,255,255,0.045);
+
+            font-size: 12px;
+        }
+
+        .stats-row-name {
+            color: #b8cde0;
+
+            overflow:
+                hidden;
+
+            text-overflow:
+                ellipsis;
+
+            white-space:
+                nowrap;
+        }
+
+        .stats-row-value {
+            color: #fff;
+
+            font-weight: 800;
+
+            white-space: nowrap;
+        }
+
+        .progress {
+            height: 7px;
+
+            margin-top: 6px;
+
+            border-radius: 999px;
+
+            background:
+                rgba(255,255,255,0.07);
+
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+
+            width: 0%;
+
+            border-radius: 999px;
+
+            background:
+                rgba(92,189,255,0.75);
+        }
+
+        .daily-list {
+            display: grid;
+
+            gap: 7px;
+
+            max-height: 500px;
+
+            overflow-y: auto;
+        }
+
+        .daily-row {
+            display: grid;
+
+            grid-template-columns:
+                90px
+                1fr
+                55px;
+
+            align-items: center;
+
+            gap: 10px;
+
+            padding:
+                8px 10px;
+
+            border-radius: 10px;
+
+            background:
+                rgba(255,255,255,0.045);
+
+            font-size: 11px;
+        }
+
+        .daily-date {
+            color: #91abc2;
+        }
+
+        .daily-bar {
+            height: 7px;
+
+            border-radius: 999px;
+
+            background:
+                rgba(255,255,255,0.06);
+
+            overflow: hidden;
+        }
+
+        .daily-bar-fill {
+            height: 100%;
+
+            width: 0%;
+
+            border-radius: 999px;
+
+            background:
+                rgba(92,189,255,0.7);
+        }
+
+        .daily-value {
+            text-align: right;
+
+            font-weight: 800;
+        }
+
+        .technical-grid {
+            display: grid;
+
+            grid-template-columns:
+                repeat(4, minmax(0, 1fr));
+
+            gap: 10px;
+        }
+
+        .technical-card {
+            padding: 12px;
+
+            border-radius: 12px;
+
+            background:
+                rgba(255,255,255,0.045);
+        }
+
+        .technical-label {
+            color: #71889f;
+
+            font-size: 10px;
+        }
+
+        .technical-value {
+            margin-top: 5px;
+
+            font-size: 14px;
+
+            font-weight: 800;
+        }
+
+        .livekit-on {
+            color: #79e6a5;
+        }
+
+        .livekit-off {
+            color: #ff8f8f;
+        }
+
+        @media (max-width: 900px) {
+
+            .stats-grid {
+                grid-template-columns:
+                    repeat(2, minmax(0, 1fr));
+            }
+
+            .technical-grid {
+                grid-template-columns:
+                    repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 700px) {
+
+            .stats-columns {
+                grid-template-columns:
+                    1fr;
+            }
+        }
+
         @media (max-width: 600px) {
 
             .app {
@@ -591,6 +899,31 @@
             .report-actions
             .button {
                 width: 100%;
+            }
+
+            .stats-grid {
+                grid-template-columns:
+                    1fr 1fr;
+            }
+
+            .technical-grid {
+                grid-template-columns:
+                    1fr 1fr;
+            }
+
+            .stat-card {
+                min-height: 95px;
+            }
+
+            .stat-value {
+                font-size: 21px;
+            }
+
+            .daily-row {
+                grid-template-columns:
+                    70px
+                    1fr
+                    42px;
             }
         }
     </style>
@@ -651,7 +984,7 @@
                 </div>
 
                 <div class="subtitle">
-                    Модерация жалоб и блокировок
+                    Статистика, модерация и состояние сервера
                 </div>
 
             </div>
@@ -666,6 +999,528 @@
         </div>
 
         <div class="admin-content">
+
+            <!-- =========================
+                 STATISTICS
+            ========================== -->
+
+            <section class="panel">
+
+                <div class="stats-header">
+
+                    <div>
+
+                        <div class="stats-title">
+                            📊 Статистика IceChat
+                        </div>
+
+                        <div
+                            id="statsUpdated"
+                            class="stats-updated">
+                            Загрузка...
+                        </div>
+
+                    </div>
+
+                    <button
+                        id="refreshStats"
+                        class="button small"
+                        type="button">
+                        🔄 Обновить
+                    </button>
+
+                </div>
+
+                <div class="stats-grid">
+
+                    <div class="stat-card">
+                        <div class="stat-icon">👤</div>
+                        <div
+                            id="statTotalUsers"
+                            class="stat-value">
+                            —
+                        </div>
+                        <div class="stat-label">
+                            Всего пользователей
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon">🟢</div>
+                        <div
+                            id="statOnline"
+                            class="stat-value">
+                            —
+                        </div>
+                        <div class="stat-label">
+                            Онлайн сейчас
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon">🔎</div>
+                        <div
+                            id="statSearching"
+                            class="stat-value">
+                            —
+                        </div>
+                        <div class="stat-label">
+                            Ищут собеседника
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon">📹</div>
+                        <div
+                            id="statInCall"
+                            class="stat-value">
+                            —
+                        </div>
+                        <div class="stat-label">
+                            Сейчас в звонке
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon">🆕</div>
+                        <div
+                            id="statNewToday"
+                            class="stat-value">
+                            —
+                        </div>
+                        <div class="stat-label">
+                            Новых сегодня
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon">📅</div>
+                        <div
+                            id="statNew7"
+                            class="stat-value">
+                            —
+                        </div>
+                        <div class="stat-label">
+                            Новых за 7 дней
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon">📅</div>
+                        <div
+                            id="statNew30"
+                            class="stat-value">
+                            —
+                        </div>
+                        <div class="stat-label">
+                            Новых за 30 дней
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon">🤝</div>
+                        <div
+                            id="statMatches"
+                            class="stat-value">
+                            —
+                        </div>
+                        <div class="stat-label">
+                            Успешных совпадений
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="stats-columns">
+
+                    <div class="stats-box">
+
+                        <div class="stats-box-title">
+                            🔎 Поиск и совпадения
+                        </div>
+
+                        <div class="stats-list">
+
+                            <div class="stats-row">
+                                <span class="stats-row-name">
+                                    Всего поисков
+                                </span>
+
+                                <span
+                                    id="searchesStarted"
+                                    class="stats-row-value">
+                                    —
+                                </span>
+                            </div>
+
+                            <div class="stats-row">
+                                <span class="stats-row-name">
+                                    Успешные совпадения
+                                </span>
+
+                                <span
+                                    id="searchesMatched"
+                                    class="stats-row-value">
+                                    —
+                                </span>
+                            </div>
+
+                            <div class="stats-row">
+                                <span class="stats-row-name">
+                                    Отменённые поиски
+                                </span>
+
+                                <span
+                                    id="searchesCancelled"
+                                    class="stats-row-value">
+                                    —
+                                </span>
+                            </div>
+
+                            <div class="stats-row">
+                                <span class="stats-row-name">
+                                    Таймауты
+                                </span>
+
+                                <span
+                                    id="searchesTimedOut"
+                                    class="stats-row-value">
+                                    —
+                                </span>
+                            </div>
+
+                            <div class="stats-row">
+
+                                <span class="stats-row-name">
+                                    Успешность поиска
+                                </span>
+
+                                <span
+                                    id="matchSuccessRate"
+                                    class="stats-row-value">
+                                    —
+                                </span>
+
+                            </div>
+
+                            <div class="progress">
+                                <div
+                                    id="matchSuccessProgress"
+                                    class="progress-fill">
+                                </div>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <div class="stats-box">
+
+                        <div class="stats-box-title">
+                            📞 Звонки
+                        </div>
+
+                        <div class="stats-list">
+
+                            <div class="stats-row">
+                                <span class="stats-row-name">
+                                    Всего разговоров
+                                </span>
+
+                                <span
+                                    id="totalCalls"
+                                    class="stats-row-value">
+                                    —
+                                </span>
+                            </div>
+
+                            <div class="stats-row">
+                                <span class="stats-row-name">
+                                    Средняя длительность
+                                </span>
+
+                                <span
+                                    id="averageDuration"
+                                    class="stats-row-value">
+                                    —
+                                </span>
+                            </div>
+
+                            <div class="stats-row">
+                                <span class="stats-row-name">
+                                    Самый долгий разговор
+                                </span>
+
+                                <span
+                                    id="longestDuration"
+                                    class="stats-row-value">
+                                    —
+                                </span>
+                            </div>
+
+                            <div class="stats-row">
+                                <span class="stats-row-name">
+                                    Разговоров до 10 секунд
+                                </span>
+
+                                <span
+                                    id="callsUnder10"
+                                    class="stats-row-value">
+                                    —
+                                </span>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="stats-columns">
+
+                    <div class="stats-box">
+
+                        <div class="stats-box-title">
+                            🌍 Страны пользователей
+                        </div>
+
+                        <div
+                            id="countriesList"
+                            class="stats-list">
+                            <div class="empty">
+                                Загрузка...
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <div class="stats-box">
+
+                        <div class="stats-box-title">
+                            ⚥ Пол пользователей
+                        </div>
+
+                        <div
+                            id="gendersList"
+                            class="stats-list">
+                            <div class="empty">
+                                Загрузка...
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="stats-columns">
+
+                    <div class="stats-box">
+
+                        <div class="stats-box-title">
+                            🔍 Поиск по полу
+                        </div>
+
+                        <div
+                            id="searchGendersList"
+                            class="stats-list">
+                            <div class="empty">
+                                Загрузка...
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <div class="stats-box">
+
+                        <div class="stats-box-title">
+                            🚨 Модерация
+                        </div>
+
+                        <div class="stats-list">
+
+                            <div class="stats-row">
+                                <span class="stats-row-name">
+                                    Всего жалоб
+                                </span>
+
+                                <span
+                                    id="totalReports"
+                                    class="stats-row-value">
+                                    —
+                                </span>
+                            </div>
+
+                            <div class="stats-row">
+                                <span class="stats-row-name">
+                                    Новых жалоб
+                                </span>
+
+                                <span
+                                    id="newReports"
+                                    class="stats-row-value">
+                                    —
+                                </span>
+                            </div>
+
+                            <div class="stats-row">
+                                <span class="stats-row-name">
+                                    Предупреждений
+                                </span>
+
+                                <span
+                                    id="warnings"
+                                    class="stats-row-value">
+                                    —
+                                </span>
+                            </div>
+
+                            <div class="stats-row">
+                                <span class="stats-row-name">
+                                    Банов
+                                </span>
+
+                                <span
+                                    id="totalBans"
+                                    class="stats-row-value">
+                                    —
+                                </span>
+                            </div>
+
+                            <div class="stats-row">
+                                <span class="stats-row-name">
+                                    Активных банов
+                                </span>
+
+                                <span
+                                    id="activeBans"
+                                    class="stats-row-value">
+                                    —
+                                </span>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="stats-box" style="margin-top:14px;">
+
+                    <div class="stats-box-title">
+                        📅 Активность по дням — последние 30 дней
+                    </div>
+
+                    <div
+                        id="dailyList"
+                        class="daily-list">
+                        <div class="empty">
+                            Загрузка...
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="stats-box" style="margin-top:14px;">
+
+                    <div class="stats-box-title">
+                        🖥️ Состояние сервера
+                    </div>
+
+                    <div class="technical-grid">
+
+                        <div class="technical-card">
+
+                            <div class="technical-label">
+                                Uptime
+                            </div>
+
+                            <div
+                                id="serverUptime"
+                                class="technical-value">
+                                —
+                            </div>
+
+                        </div>
+
+                        <div class="technical-card">
+
+                            <div class="technical-label">
+                                RAM
+                            </div>
+
+                            <div
+                                id="serverMemory"
+                                class="technical-value">
+                                —
+                            </div>
+
+                        </div>
+
+                        <div class="technical-card">
+
+                            <div class="technical-label">
+                                Активный поиск
+                            </div>
+
+                            <div
+                                id="technicalWaiting"
+                                class="technical-value">
+                                —
+                            </div>
+
+                        </div>
+
+                        <div class="technical-card">
+
+                            <div class="technical-label">
+                                Активные комнаты
+                            </div>
+
+                            <div
+                                id="technicalRooms"
+                                class="technical-value">
+                                —
+                            </div>
+
+                        </div>
+
+                        <div class="technical-card">
+
+                            <div class="technical-label">
+                                LiveKit
+                            </div>
+
+                            <div
+                                id="technicalLiveKit"
+                                class="technical-value">
+                                —
+                            </div>
+
+                        </div>
+
+                        <div class="technical-card">
+
+                            <div class="technical-label">
+                                LiveKit rooms
+                            </div>
+
+                            <div
+                                id="technicalLiveKitRooms"
+                                class="technical-value">
+                                —
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+            <!-- =========================
+                 REPORTS
+            ========================== -->
 
             <section class="panel">
 
@@ -700,6 +1555,10 @@
                 </div>
 
             </section>
+
+            <!-- =========================
+                 BANS
+            ========================== -->
 
             <section class="panel">
 
@@ -806,6 +1665,14 @@ document.addEventListener(
                 "refreshBans"
             );
 
+        var refreshStats =
+            document.getElementById(
+                "refreshStats"
+            );
+
+        var statsTimer =
+            null;
+
         function escapeHtml(
             value
         ) {
@@ -878,6 +1745,127 @@ document.addEventListener(
             );
         }
 
+        function formatNumber(
+            value
+        ) {
+
+            return Number(
+                value || 0
+            ).toLocaleString(
+                "ru-RU"
+            );
+        }
+
+        function formatDuration(
+            milliseconds
+        ) {
+
+            var seconds =
+                Math.max(
+                    0,
+                    Math.round(
+                        Number(
+                            milliseconds || 0
+                        ) / 1000
+                    )
+                );
+
+            var hours =
+                Math.floor(
+                    seconds / 3600
+                );
+
+            var minutes =
+                Math.floor(
+                    (seconds % 3600) / 60
+                );
+
+            var secs =
+                seconds % 60;
+
+            if (hours > 0) {
+
+                return (
+                    hours +
+                    "ч " +
+                    minutes +
+                    "м " +
+                    secs +
+                    "с"
+                );
+            }
+
+            if (minutes > 0) {
+
+                return (
+                    minutes +
+                    "м " +
+                    secs +
+                    "с"
+                );
+            }
+
+            return (
+                secs +
+                "с"
+            );
+        }
+
+        function formatUptime(
+            seconds
+        ) {
+
+            seconds =
+                Math.max(
+                    0,
+                    Math.floor(
+                        Number(
+                            seconds || 0
+                        )
+                    )
+                );
+
+            var days =
+                Math.floor(
+                    seconds / 86400
+                );
+
+            var hours =
+                Math.floor(
+                    (seconds % 86400) / 3600
+                );
+
+            var minutes =
+                Math.floor(
+                    (seconds % 3600) / 60
+                );
+
+            if (days > 0) {
+
+                return (
+                    days +
+                    "д " +
+                    hours +
+                    "ч"
+                );
+            }
+
+            if (hours > 0) {
+
+                return (
+                    hours +
+                    "ч " +
+                    minutes +
+                    "м"
+                );
+            }
+
+            return (
+                minutes +
+                "м"
+            );
+        }
+
         function showAdmin() {
 
             loginScreen.classList.add(
@@ -889,6 +1877,15 @@ document.addEventListener(
             );
 
             loadAll();
+
+            if (!statsTimer) {
+
+                statsTimer =
+                    setInterval(
+                        loadStats,
+                        30000
+                    );
+            }
         }
 
         function showLogin() {
@@ -900,6 +1897,16 @@ document.addEventListener(
             loginScreen.classList.remove(
                 "hidden"
             );
+
+            if (statsTimer) {
+
+                clearInterval(
+                    statsTimer
+                );
+
+                statsTimer =
+                    null;
+            }
         }
 
         async function checkSession() {
@@ -1012,6 +2019,622 @@ document.addEventListener(
 
             showLogin();
         }
+
+        /* =========================
+           STATISTICS
+        ========================== */
+
+        async function loadStats() {
+
+            try {
+
+                var response =
+                    await fetch(
+                        "/api/admin/stats"
+                    );
+
+                if (
+                    response.status ===
+                    401
+                ) {
+
+                    showLogin();
+
+                    return;
+                }
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        "Ошибка загрузки статистики"
+                    );
+                }
+
+                var data =
+                    await response.json();
+
+                renderStats(
+                    data
+                );
+
+            } catch (error) {
+
+                console.error(
+                    error
+                );
+
+                var updated =
+                    document.getElementById(
+                        "statsUpdated"
+                    );
+
+                if (updated) {
+
+                    updated.textContent =
+                        "Ошибка загрузки статистики";
+                }
+            }
+        }
+
+        function renderStats(
+            data
+        ) {
+
+            data =
+                data || {};
+
+            var users =
+                data.users || {};
+
+            var matching =
+                data.matching || {};
+
+            var calls =
+                data.calls || {};
+
+            var countries =
+                data.countries || {};
+
+            var genders =
+                data.genders || {};
+
+            var searchGenders =
+                data.searchGenders || {};
+
+            var moderation =
+                data.moderation || {};
+
+            var technical =
+                data.technical || {};
+
+            document.getElementById(
+                "statTotalUsers"
+            ).textContent =
+                formatNumber(
+                    users.total
+                );
+
+            document.getElementById(
+                "statOnline"
+            ).textContent =
+                formatNumber(
+                    users.online
+                );
+
+            document.getElementById(
+                "statSearching"
+            ).textContent =
+                formatNumber(
+                    users.searching
+                );
+
+            document.getElementById(
+                "statInCall"
+            ).textContent =
+                formatNumber(
+                    users.inCall
+                );
+
+            document.getElementById(
+                "statNewToday"
+            ).textContent =
+                formatNumber(
+                    users.newToday
+                );
+
+            document.getElementById(
+                "statNew7"
+            ).textContent =
+                formatNumber(
+                    users.new7Days
+                );
+
+            document.getElementById(
+                "statNew30"
+            ).textContent =
+                formatNumber(
+                    users.new30Days
+                );
+
+            document.getElementById(
+                "statMatches"
+            ).textContent =
+                formatNumber(
+                    matching.searchesMatched
+                );
+
+            document.getElementById(
+                "searchesStarted"
+            ).textContent =
+                formatNumber(
+                    matching.searchesStarted
+                );
+
+            document.getElementById(
+                "searchesMatched"
+            ).textContent =
+                formatNumber(
+                    matching.searchesMatched
+                );
+
+            document.getElementById(
+                "searchesCancelled"
+            ).textContent =
+                formatNumber(
+                    matching.searchesCancelled
+                );
+
+            document.getElementById(
+                "searchesTimedOut"
+            ).textContent =
+                formatNumber(
+                    matching.searchesTimedOut
+                );
+
+            var successRate =
+                Number(
+                    matching.matchSuccessRate || 0
+                );
+
+            document.getElementById(
+                "matchSuccessRate"
+            ).textContent =
+                successRate.toFixed(1) +
+                "%";
+
+            document.getElementById(
+                "matchSuccessProgress"
+            ).style.width =
+                Math.min(
+                    100,
+                    Math.max(
+                        0,
+                        successRate
+                    )
+                ) +
+                "%";
+
+            document.getElementById(
+                "totalCalls"
+            ).textContent =
+                formatNumber(
+                    calls.total
+                );
+
+            document.getElementById(
+                "averageDuration"
+            ).textContent =
+                formatDuration(
+                    calls.averageDurationMs
+                );
+
+            document.getElementById(
+                "longestDuration"
+            ).textContent =
+                formatDuration(
+                    calls.longestDurationMs
+                );
+
+            document.getElementById(
+                "callsUnder10"
+            ).textContent =
+                formatNumber(
+                    calls.callsUnder10Seconds
+                );
+
+            document.getElementById(
+                "totalReports"
+            ).textContent =
+                formatNumber(
+                    moderation.totalReports
+                );
+
+            document.getElementById(
+                "newReports"
+            ).textContent =
+                formatNumber(
+                    moderation.newReports
+                );
+
+            document.getElementById(
+                "warnings"
+            ).textContent =
+                formatNumber(
+                    moderation.warnings
+                );
+
+            document.getElementById(
+                "totalBans"
+            ).textContent =
+                formatNumber(
+                    moderation.totalBans
+                );
+
+            document.getElementById(
+                "activeBans"
+            ).textContent =
+                formatNumber(
+                    moderation.activeBans
+                );
+
+            document.getElementById(
+                "serverUptime"
+            ).textContent =
+                formatUptime(
+                    technical.uptimeSeconds
+                );
+
+            var memory =
+                technical.memory || {};
+
+            document.getElementById(
+                "serverMemory"
+            ).textContent =
+                (
+                    Number(
+                        memory.rss || 0
+                    ) / 1024 / 1024
+                ).toFixed(1) +
+                " MB";
+
+            document.getElementById(
+                "technicalWaiting"
+            ).textContent =
+                formatNumber(
+                    technical.waiting
+                );
+
+            document.getElementById(
+                "technicalRooms"
+            ).textContent =
+                formatNumber(
+                    technical.rooms
+                );
+
+            var livekitElement =
+                document.getElementById(
+                    "technicalLiveKit"
+                );
+
+            if (
+                technical.livekitEnabled
+            ) {
+
+                livekitElement.textContent =
+                    "🟢 Подключён";
+
+                livekitElement.className =
+                    "technical-value livekit-on";
+
+            } else {
+
+                livekitElement.textContent =
+                    "🔴 Выключен";
+
+                livekitElement.className =
+                    "technical-value livekit-off";
+            }
+
+            document.getElementById(
+                "technicalLiveKitRooms"
+            ).textContent =
+                formatNumber(
+                    technical.livekitRooms
+                );
+
+            renderStatsList(
+                "countriesList",
+                countries,
+                "Нет данных"
+            );
+
+            renderStatsList(
+                "gendersList",
+                genders,
+                "Нет данных"
+            );
+
+            renderStatsList(
+                "searchGendersList",
+                searchGenders,
+                "Нет данных"
+            );
+
+            renderDaily(
+                data.daily || {}
+            );
+
+            document.getElementById(
+                "statsUpdated"
+            ).textContent =
+                "Обновлено: " +
+                new Date().toLocaleTimeString(
+                    "ru-RU"
+                );
+        }
+
+        function renderStatsList(
+            elementId,
+            object,
+            emptyText
+        ) {
+
+            var element =
+                document.getElementById(
+                    elementId
+                );
+
+            var entries =
+                Object.entries(
+                    object || {}
+                );
+
+            entries.sort(
+                function (a, b) {
+
+                    return (
+                        Number(b[1] || 0) -
+                        Number(a[1] || 0)
+                    );
+                }
+            );
+
+            if (!entries.length) {
+
+                element.innerHTML =
+                    '<div class="empty">' +
+                    escapeHtml(
+                        emptyText
+                    ) +
+                    '</div>';
+
+                return;
+            }
+
+            var max =
+                Math.max.apply(
+                    null,
+                    entries.map(
+                        function (item) {
+                            return Number(
+                                item[1] || 0
+                            );
+                        }
+                    )
+                );
+
+            if (max <= 0) {
+                max = 1;
+            }
+
+            element.innerHTML =
+                entries
+                    .slice(0, 15)
+                    .map(
+                        function (item) {
+
+                            var name =
+                                item[0];
+
+                            var value =
+                                Number(
+                                    item[1] || 0
+                                );
+
+                            var percent =
+                                (
+                                    value /
+                                    max *
+                                    100
+                                );
+
+                            return `
+                                <div>
+
+                                    <div class="stats-row">
+
+                                        <span
+                                            class="stats-row-name">
+
+                                            ${escapeHtml(
+                                                name
+                                            )}
+
+                                        </span>
+
+                                        <span
+                                            class="stats-row-value">
+
+                                            ${formatNumber(
+                                                value
+                                            )}
+
+                                        </span>
+
+                                    </div>
+
+                                    <div class="progress">
+
+                                        <div
+                                            class="progress-fill"
+                                            style="width:${percent}%">
+                                        </div>
+
+                                    </div>
+
+                                </div>
+                            `;
+                        }
+                    )
+                    .join("");
+        }
+
+        function renderDaily(
+            daily
+        ) {
+
+            var element =
+                document.getElementById(
+                    "dailyList"
+                );
+
+            var entries =
+                Object.entries(
+                    daily || {}
+                );
+
+            entries.sort(
+                function (a, b) {
+
+                    return a[0].localeCompare(
+                        b[0]
+                    );
+                }
+            );
+
+            if (!entries.length) {
+
+                element.innerHTML =
+                    '<div class="empty">Данных пока нет</div>';
+
+                return;
+            }
+
+            var max =
+                Math.max.apply(
+                    null,
+                    entries.map(
+                        function (item) {
+
+                            var day =
+                                item[1] || {};
+
+                            return Number(
+                                day.searchesStarted ||
+                                day.searches ||
+                                day.users ||
+                                0
+                            );
+                        }
+                    )
+                );
+
+            if (max <= 0) {
+                max = 1;
+            }
+
+            element.innerHTML =
+                entries
+                    .slice(-30)
+                    .reverse()
+                    .map(
+                        function (item) {
+
+                            var date =
+                                item[0];
+
+                            var day =
+                                item[1] || {};
+
+                            var value =
+                                Number(
+                                    day.searchesStarted ||
+                                    day.searches ||
+                                    day.users ||
+                                    0
+                                );
+
+                            var percent =
+                                (
+                                    value /
+                                    max *
+                                    100
+                                );
+
+                            var formattedDate =
+                                date;
+
+                            try {
+
+                                var parts =
+                                    date.split(
+                                        "-"
+                                    );
+
+                                if (
+                                    parts.length ===
+                                    3
+                                ) {
+
+                                    formattedDate =
+                                        parts[2] +
+                                        "." +
+                                        parts[1];
+                                }
+
+                            } catch (error) {}
+
+                            return `
+                                <div class="daily-row">
+
+                                    <div
+                                        class="daily-date">
+
+                                        ${escapeHtml(
+                                            formattedDate
+                                        )}
+
+                                    </div>
+
+                                    <div
+                                        class="daily-bar">
+
+                                        <div
+                                            class="daily-bar-fill"
+                                            style="width:${percent}%">
+                                        </div>
+
+                                    </div>
+
+                                    <div
+                                        class="daily-value">
+
+                                        ${formatNumber(
+                                            value
+                                        )}
+
+                                    </div>
+
+                                </div>
+                            `;
+                        }
+                    )
+                    .join("");
+        }
+
+        /* =========================
+           REPORTS
+        ========================== */
 
         async function loadReports() {
 
@@ -1456,6 +3079,10 @@ document.addEventListener(
                     .join("");
         }
 
+        /* =========================
+           BANS
+        ========================== */
+
         async function loadBans() {
 
             banList.innerHTML =
@@ -1601,6 +3228,10 @@ document.addEventListener(
                     )
                     .join("");
         }
+
+        /* =========================
+           MODERATION ACTIONS
+        ========================== */
 
         async function processReport(
             reportId,
@@ -1816,7 +3447,7 @@ document.addEventListener(
                     );
                 }
 
-                await loadBans();
+                await loadAll();
 
             } catch (error) {
 
@@ -1829,10 +3460,15 @@ document.addEventListener(
         async function loadAll() {
 
             await Promise.all([
+                loadStats(),
                 loadReports(),
                 loadBans()
             ]);
         }
+
+        /* =========================
+           EVENTS
+        ========================== */
 
         loginButton.addEventListener(
             "click",
@@ -1858,6 +3494,11 @@ document.addEventListener(
         logoutButton.addEventListener(
             "click",
             logout
+        );
+
+        refreshStats.addEventListener(
+            "click",
+            loadStats
         );
 
         refreshReports.addEventListener(
