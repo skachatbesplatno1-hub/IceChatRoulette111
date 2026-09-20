@@ -1,6133 +1,3565 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
+require("dotenv").config();
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0, viewport-fit=cover"
-    >
+const express = require("express");
+const http = require("http");
+const path = require("path");
+const fs = require("fs");
+const crypto = require("crypto");
 
-    <title>IceChat — видеочат-рулетка 1 на 1</title>
-    <link rel="icon" type="image/png" href="/icechat-logo.png">
+const {
+    AccessToken,
+    RoomServiceClient
+} = require("livekit-server-sdk");
 
-<meta name="description" content="IceChat — бесплатная видеочат-рулетка 1 на 1. Общайтесь со случайными собеседниками и выбирайте пол собеседника.">
+const app = express();
+const server = http.createServer(app);
 
-<meta name="keywords" content="видеочат рулетка, чат рулетка, видеочат, видеочат 1 на 1, видеочат с выбором пола, IceChat">
+const PORT = process.env.PORT || 3000;
 
-<meta name="robots" content="index, follow">
+/* =========================
+   EXPRESS
+   ========================= */
 
-    <style>
-        * {
-            box-sizing: border-box;
+app.use(
+    express.json({
+        limit: "5mb"
+    })
+);
+
+app.use(
+    express.static(__dirname)
+);
+
+/* =========================
+   MATCHING STATE
+   ========================= */
+
+const waitingUsers = new Map();
+const matches = new Map();
+const matchRooms = new Map();
+const socketOwners = new Map();
+
+/* =========================
+   LIVEKIT STATE
+   ========================= */
+
+const liveKitParticipants = new Map();
+
+/* =========================
+   FILES
+   ========================= */
+
+const REPORTS_FILE =
+    path.join(__dirname, "reports.json");
+
+const BANS_FILE =
+    path.join(__dirname, "bans.json");
+
+const STATS_FILE =
+    path.join(__dirname, "stats.json");
+
+/* =========================
+   ADMIN
+   ========================= */
+
+const adminSessions = new Map();
+
+const ADMIN_PASSWORD =
+    process.env.ADMIN_PASSWORD || "";
+
+/* =========================
+   LIVEKIT ADMIN CLIENT
+   ========================= */
+
+function getLiveKitHttpUrl() {
+    let url =
+        process.env.LIVEKIT_URL || "";
+
+    url = url.trim();
+
+    if (url.startsWith("wss://")) {
+        return "https://" + url.slice(6);
+    }
+
+    if (url.startsWith("ws://")) {
+        return "http://" + url.slice(5);
+    }
+
+    return url;
+}
+
+let liveKitRoomService = null;
+
+if (
+    process.env.LIVEKIT_URL &&
+    process.env.LIVEKIT_API_KEY &&
+    process.env.LIVEKIT_API_SECRET
+) {
+    liveKitRoomService =
+        new RoomServiceClient(
+            getLiveKitHttpUrl(),
+            process.env.LIVEKIT_API_KEY,
+            process.env.LIVEKIT_API_SECRET
+        );
+}
+
+/* =========================
+   HELPERS
+   ========================= */
+
+function randomId(prefix) {
+    return (
+        prefix +
+        crypto.randomBytes(12).toString("hex")
+    );
+}
+
+function todayKey() {
+    const date = new Date();
+
+    return (
+        date.getFullYear() +
+        "-" +
+        String(date.getMonth() + 1).padStart(2, "0") +
+        "-" +
+        String(date.getDate()).padStart(2, "0")
+    );
+}
+
+function getDefaultStats() {
+    return {
+        users: {},
+
+        totals: {
+            searchesStarted: 0,
+            searchesMatched: 0,
+            searchesCancelled: 0,
+            searchesTimedOut: 0,
+
+            sessionsCompleted: 0,
+
+            totalCallDurationMs: 0,
+            longestCallDurationMs: 0,
+
+            callsUnder10Seconds: 0
+        },
+
+        daily: {},
+
+        sessions: []
+    };
+}
+
+function readStats() {
+    try {
+        if (!fs.existsSync(STATS_FILE)) {
+            const stats =
+                getDefaultStats();
+
+            writeStats(stats);
+
+            return stats;
         }
 
-        html,
-        body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            min-height: 100%;
-            font-family: Arial, Helvetica, sans-serif;
-
-            background:
-                radial-gradient(
-                    circle at top,
-                    #203b59 0%,
-                    #0c1724 45%,
-                    #060b12 100%
-                );
-
-            color: #fff;
-        }
-
-        body {
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
-
-        button,
-        input,
-        textarea {
-            font: inherit;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        .app {
-            width: 100%;
-            min-height: 100vh;
-        }
-
-        /* =========================
-           HEADER
-           ========================= */
-
-        .header {
-            width: 100%;
-            height: 74px;
-            padding: 0 28px;
-
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-
-            gap: 14px;
-
-            border-bottom:
-                1px solid rgba(255,255,255,0.08);
-
-            background:
-                rgba(10,20,32,0.72);
-
-            backdrop-filter: blur(18px);
-            -webkit-backdrop-filter: blur(18px);
-        }
-
-        .logo {
-            font-size: 27px;
-            font-weight: 800;
-            letter-spacing: 0.5px;
-        }
-
-        .header-right {
-            min-width: 0;
-
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-
-            gap: 8px;
-        }
-
-        .status {
-            max-width: 50%;
-
-            padding: 10px 15px;
-
-            border-radius: 999px;
-
-            background:
-                rgba(255,255,255,0.07);
-
-            border:
-                1px solid rgba(255,255,255,0.09);
-
-            color: #cdeaff;
-            font-size: 14px;
-
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .rules-open-button {
-            flex: 0 0 auto;
-
-            min-height: 40px;
-
-            padding: 0 14px;
-
-            border-radius: 12px;
-
-            border:
-                1px solid rgba(255,255,255,0.1);
-
-            background:
-                rgba(255,255,255,0.06);
-
-            color: #d8ecff;
-
-            cursor: pointer;
-
-            transition:
-                background 0.15s ease,
-                transform 0.15s ease;
-        }
-
-        .rules-open-button:hover {
-            background:
-                rgba(255,255,255,0.11);
-
-            transform:
-                translateY(-1px);
-        }
-
-        .rules-open-button:active {
-            transform:
-                scale(0.98);
-        }
-
-        /* =========================
-           MAIN
-           ========================= */
-
-        .main {
-            width:
-                min(
-                    1180px,
-                    calc(100% - 30px)
-                );
-
-            margin:
-                28px auto 40px;
-        }
-
-        /* =========================
-           SETUP
-           ========================= */
-
-        .setup {
-            display: grid;
-
-            grid-template-columns:
-                1fr 1fr;
-
-            gap: 18px;
-
-            margin-bottom: 22px;
-        }
-
-        .setup-block {
-            min-width: 0;
-
-            padding: 20px;
-
-            border:
-                1px solid rgba(255,255,255,0.09);
-
-            border-radius: 22px;
-
-            background:
-                rgba(255,255,255,0.055);
-
-            box-shadow:
-                0 18px 50px
-                rgba(0,0,0,0.22);
-
-            backdrop-filter: blur(18px);
-            -webkit-backdrop-filter: blur(18px);
-        }
-
-        .setup-title {
-            margin-bottom: 13px;
-
-            font-size: 14px;
-            color: #a9c4df;
-            font-weight: 700;
-        }
-
-        .choice-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-
-        .choice-button {
-            position: relative;
-            z-index: 20;
-
-            min-height: 46px;
-            padding: 0 18px;
-
-            border:
-                1px solid rgba(255,255,255,0.13);
-
-            border-radius: 14px;
-
-            background:
-                rgba(255,255,255,0.065);
-
-            color: #e9f5ff;
-
-            cursor: pointer;
-
-            transition:
-                transform 0.15s ease,
-                background 0.15s ease,
-                border-color 0.15s ease,
-                box-shadow 0.15s ease;
-        }
-
-        .choice-button:hover {
-            background:
-                rgba(255,255,255,0.11);
-
-            transform:
-                translateY(-1px);
-        }
-
-        .choice-button:active {
-            transform:
-                scale(0.98);
-        }
-
-        .choice-button.selected {
-            background:
-                rgba(82,174,255,0.25);
-
-            border-color:
-                rgba(102,195,255,0.95);
-
-            box-shadow:
-                0 0 0 2px
-                rgba(73,171,255,0.24),
-
-                0 8px 25px
-                rgba(30,130,220,0.2);
-
-            color: #fff;
-        }
-
-        /* =========================
-           VIDEOS
-           ========================= */
-
-        .videos {
-            position: relative;
-
-            display: grid;
-
-            grid-template-columns:
-                minmax(0, 1fr) 300px;
-
-            gap: 18px;
-
-            align-items: stretch;
-        }
-
-        .video-card {
-            position: relative;
-
-            min-width: 0;
-            height: 540px;
-
-            overflow: hidden;
-
-            border-radius: 24px;
-
-            border:
-                1px solid rgba(255,255,255,0.1);
-
-            background: #050a10;
-
-            box-shadow:
-                0 25px 70px
-                rgba(0,0,0,0.35);
-        }
-
-        .video-card.small {
-            height: 540px;
-        }
-
-        .video-card video {
-            position: absolute;
-
-            inset: 0;
-
-            z-index: 1;
-
-            width: 100%;
-            height: 100%;
-
-            object-fit: cover;
-
-            background: #050a10;
-        }
-
-        .video-placeholder {
-            position: absolute;
-
-            inset: 0;
-
-            z-index: 3;
-
-            display: flex;
-
-            align-items: center;
-            justify-content: center;
-
-            text-align: center;
-
-            color: #91abc2;
-
-            background:
-                radial-gradient(
-                    circle at center,
-                    rgba(56,107,150,0.16),
-                    rgba(4,10,17,0.95)
-                );
-
-            pointer-events: none;
-        }
-
-        .placeholder-icon {
-            margin-bottom: 12px;
-            font-size: 52px;
-            opacity: 0.75;
-        }
-
-        .person-info {
-            position: absolute;
-
-            z-index: 6;
-
-            left: 16px;
-            top: 16px;
-
-            display: flex;
-
-            align-items: center;
-
-            gap: 7px;
-
-            max-width:
-                calc(100% - 32px);
-
-            padding: 9px 13px;
-
-            border-radius: 999px;
-
-            background:
-                rgba(3,8,14,0.7);
-
-            border:
-                1px solid rgba(255,255,255,0.1);
-
-            color: #fff;
-
-            font-size: 13px;
-
-            pointer-events: none;
-
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-        }
-
-        .person-info.hidden {
-            display: none;
-        }
-
-        .video-label {
-            position: absolute;
-
-            z-index: 6;
-
-            left: 15px;
-            bottom: 15px;
-
-            padding: 8px 12px;
-
-            border-radius: 999px;
-
-            background:
-                rgba(3,8,14,0.72);
-
-            border:
-                1px solid rgba(255,255,255,0.09);
-
-            color: #fff;
-
-            font-size: 13px;
-
-            pointer-events: none;
-        }
-
-        /* =========================
-           CHAT
-           ========================= */
-
-        .chat-panel {
-            margin-top: 18px;
-            padding: 18px;
-
-            border:
-                1px solid rgba(255,255,255,0.09);
-
-            border-radius: 22px;
-
-            background:
-                rgba(255,255,255,0.055);
-
-            box-shadow:
-                0 18px 50px
-                rgba(0,0,0,0.22);
-
-            backdrop-filter: blur(18px);
-            -webkit-backdrop-filter: blur(18px);
-        }
-
-        .chat-header {
-            display: flex;
-
-            align-items: center;
-            justify-content: space-between;
-
-            gap: 10px;
-
-            margin-bottom: 12px;
-        }
-
-        .chat-title {
-            font-size: 16px;
-            font-weight: 700;
-        }
-
-        .chat-status {
-            min-width: 0;
-
-            color: #91abc2;
-            font-size: 12px;
-
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .chat-messages {
-            width: 100%;
-            height: 220px;
-
-            padding: 12px;
-
-            overflow-y: auto;
-            overflow-x: hidden;
-
-            border-radius: 16px;
-
-            border:
-                1px solid rgba(255,255,255,0.08);
-
-            background:
-                rgba(2,7,13,0.52);
-
-            display: flex;
-
-            flex-direction: column;
-
-            gap: 8px;
-
-            overscroll-behavior: contain;
-            -webkit-overflow-scrolling:
-                touch;
-        }
-
-        .chat-empty {
-            margin: auto;
-
-            text-align: center;
-
-            color: #71889f;
-            font-size: 13px;
-        }
-
-        .chat-message {
-            max-width: 78%;
-
-            padding: 9px 12px;
-
-            border-radius: 14px;
-
-            font-size: 14px;
-            line-height: 1.35;
-
-            word-break: break-word;
-            overflow-wrap: anywhere;
-
-            white-space: pre-wrap;
-        }
-
-        .chat-message.mine {
-            align-self: flex-end;
-
-            background:
-                rgba(62,169,255,0.22);
-
-            border:
-                1px solid rgba(92,189,255,0.25);
-
-            border-bottom-right-radius: 5px;
-        }
-
-        .chat-message.theirs {
-            align-self: flex-start;
-
-            background:
-                rgba(255,255,255,0.08);
-
-            border:
-                1px solid rgba(255,255,255,0.08);
-
-            border-bottom-left-radius: 5px;
-        }
-
-        .chat-form {
-            display: flex;
-
-            gap: 10px;
-
-            margin-top: 10px;
-        }
-
-        .chat-input {
-            min-width: 0;
-            flex: 1;
-
-            height: 48px;
-
-            padding: 0 15px;
-
-            border-radius: 14px;
-
-            border:
-                1px solid rgba(255,255,255,0.1);
-
-            background:
-                rgba(0,0,0,0.25);
-
-            color: #fff;
-
-            outline: none;
-        }
-
-        .chat-input::placeholder {
-            color: #71889f;
-        }
-
-        .chat-input:focus {
-            border-color:
-                rgba(92,189,255,0.65);
-
-            box-shadow:
-                0 0 0 2px
-                rgba(73,171,255,0.12);
-        }
-
-        .chat-input:disabled {
-            opacity: 0.45;
-        }
-
-        .chat-send {
-            min-width: 110px;
-            height: 48px;
-
-            padding: 0 18px;
-
-            border-radius: 14px;
-
-            border:
-                1px solid rgba(92,189,255,0.45);
-
-            background:
-                rgba(62,169,255,0.2);
-
-            color: #fff;
-
-            cursor: pointer;
-
-            transition:
-                background 0.15s ease,
-                transform 0.15s ease,
-                opacity 0.15s ease;
-        }
-
-        .chat-send:hover:not(:disabled) {
-            background:
-                rgba(62,169,255,0.3);
-
-            transform:
-                translateY(-1px);
-        }
-
-        .chat-send:active:not(:disabled) {
-            transform:
-                scale(0.98);
-        }
-
-        .chat-send:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
-
-        /* =========================
-           CONTROLS
-           ========================= */
-
-        .controls {
-            margin-top: 18px;
-
-            display: flex;
-            flex-wrap: wrap;
-
-            gap: 10px;
-        }
-
-        .controls button {
-            position: relative;
-            z-index: 20;
-
-            min-height: 48px;
-
-            padding: 0 18px;
-
-            border-radius: 14px;
-
-            border:
-                1px solid rgba(255,255,255,0.1);
-
-            background:
-                rgba(255,255,255,0.07);
-
-            color: #fff;
-
-            cursor: pointer;
-
-            transition:
-                background 0.15s ease,
-                transform 0.15s ease,
-                opacity 0.15s ease;
-        }
-
-        .controls button:hover:not(:disabled) {
-            background:
-                rgba(255,255,255,0.12);
-
-            transform:
-                translateY(-1px);
-        }
-
-        .controls button:active:not(:disabled) {
-            transform:
-                scale(0.98);
-        }
-
-        .controls button:disabled {
-            opacity: 0.45;
-            cursor: not-allowed;
-        }
-
-        .primary-button {
-            flex: 1 1 260px;
-
-            background:
-                rgba(62,169,255,0.24) !important;
-
-            border-color:
-                rgba(92,189,255,0.72) !important;
-        }
-
-        .stop-button {
-            background:
-                rgba(255,76,76,0.13) !important;
-
-            border-color:
-                rgba(255,100,100,0.35) !important;
-        }
-
-        .camera-switch-button {
-            background:
-                rgba(151,117,255,0.15) !important;
-
-            border-color:
-                rgba(163,134,255,0.4) !important;
-        }
-
-        .report-button {
-            background:
-                rgba(255,80,80,0.13) !important;
-
-            border-color:
-                rgba(255,105,105,0.38) !important;
-        }
-
-        .timer {
-            font-variant-numeric: tabular-nums;
-            white-space: nowrap;
-        }
-
-
-        /* =========================
-           DONATION BUTTON
-           ========================= */
-
-        .donation-button {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 40px;
-            padding: 0 14px;
-            border-radius: 12px;
-            border: 1px solid rgba(92,189,255,0.38);
-            background: linear-gradient(
-                135deg,
-                rgba(62,169,255,0.16),
-                rgba(151,117,255,0.14)
+        const data =
+            fs.readFileSync(
+                STATS_FILE,
+                "utf8"
             );
-            color: #eaf7ff;
-            text-decoration: none;
-            font-size: 13px;
-            font-weight: 700;
-            white-space: nowrap;
-            box-shadow: 0 6px 22px rgba(30,130,220,0.10);
-            transition:
-                background 0.15s ease,
-                border-color 0.15s ease,
-                transform 0.15s ease,
-                box-shadow 0.15s ease;
-        }
 
-        .donation-button:hover {
-            background: linear-gradient(
-                135deg,
-                rgba(62,169,255,0.28),
-                rgba(151,117,255,0.24)
-            );
-            border-color: rgba(102,195,255,0.72);
-            transform: translateY(-1px);
-            box-shadow: 0 8px 28px rgba(30,130,220,0.20);
-        }
+        const parsed =
+            JSON.parse(data);
 
-        .donation-button:active {
-            transform: scale(0.98);
-        }
+        const defaults =
+            getDefaultStats();
 
-        /* =========================
-           RULES MODAL
-           ========================= */
+        return {
+            ...defaults,
+            ...parsed,
 
-        .rules-modal {
-            position: fixed;
+            totals: {
+                ...defaults.totals,
+                ...(parsed.totals || {})
+            },
 
-            inset: 0;
+            daily:
+                parsed.daily || {},
 
-            z-index: 2000;
+            users:
+                parsed.users || {},
 
-            display: flex;
+            sessions:
+                Array.isArray(parsed.sessions)
+                    ? parsed.sessions
+                    : []
+        };
 
-            align-items: center;
-            justify-content: center;
-
-            padding: 16px;
-
-            background:
-                rgba(0,0,0,0.78);
-
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-        }
-
-        .rules-modal.hidden {
-            display: none;
-        }
-
-        .rules-box {
-            width:
-                min(
-                    760px,
-                    100%
-                );
-
-            max-height:
-                calc(100vh - 32px);
-
-            display: flex;
-
-            flex-direction: column;
-
-            border-radius: 24px;
-
-            border:
-                1px solid rgba(255,255,255,0.12);
-
-            background:
-                rgba(11,21,33,0.98);
-
-            box-shadow:
-                0 35px 120px
-                rgba(0,0,0,0.62);
-
-            overflow: hidden;
-        }
-
-        .rules-header {
-            flex: 0 0 auto;
-
-            padding:
-                22px 24px 15px;
-
-            border-bottom:
-                1px solid rgba(255,255,255,0.08);
-        }
-
-        .rules-title {
-            font-size: 24px;
-            font-weight: 800;
-        }
-
-        .rules-subtitle {
-            margin-top: 6px;
-
-            color: #91abc2;
-
-            font-size: 13px;
-            line-height: 1.4;
-        }
-
-        .rules-content {
-            flex: 1;
-
-            min-height: 0;
-
-            padding:
-                20px 24px;
-
-            overflow-y: auto;
-
-            -webkit-overflow-scrolling:
-                touch;
-        }
-
-        .rules-content h3 {
-            margin:
-                0 0 7px;
-
-            font-size: 15px;
-        }
-
-        .rules-content p {
-            margin:
-                0 0 16px;
-
-            color: #c5d5e4;
-
-            font-size: 13px;
-            line-height: 1.55;
-        }
-
-        .rules-footer {
-            flex: 0 0 auto;
-
-            padding:
-                16px 24px 20px;
-
-            border-top:
-                1px solid rgba(255,255,255,0.08);
-
-            background:
-                rgba(255,255,255,0.025);
-        }
-
-        .rules-check {
-            display: flex;
-
-            align-items: flex-start;
-
-            gap: 10px;
-
-            margin-bottom: 14px;
-
-            color: #d9e7f4;
-
-            font-size: 13px;
-            line-height: 1.4;
-
-            cursor: pointer;
-        }
-
-        .rules-check input {
-            flex:
-                0 0 auto;
-
-            width: 18px;
-            height: 18px;
-
-            margin-top: 1px;
-
-            accent-color: #52aeff;
-
-            cursor: pointer;
-        }
-
-        .rules-continue {
-            width: 100%;
-
-            min-height: 50px;
-
-            border-radius: 14px;
-
-            border:
-                1px solid rgba(92,189,255,0.72);
-
-            background:
-                rgba(62,169,255,0.24);
-
-            color: #fff;
-
-            font-weight: 700;
-
-            cursor: pointer;
-
-            transition:
-                background 0.15s ease,
-                transform 0.15s ease,
-                opacity 0.15s ease;
-        }
-
-        .rules-continue:hover:not(:disabled) {
-            background:
-                rgba(62,169,255,0.34);
-
-            transform:
-                translateY(-1px);
-        }
-
-        .rules-continue:active:not(:disabled) {
-            transform:
-                scale(0.98);
-        }
-
-        .rules-continue:disabled {
-            opacity: 0.4;
-
-            cursor: not-allowed;
-
-            transform: none;
-        }
-
-        /* =========================
-           FIRST-ENTRY RULES GATE
-           ========================= */
-        .rules-modal.entry-gate {
-            z-index: 3000;
-        }
-
-        .rules-gate-note {
-            margin-top: 10px;
-            color: #91abc2;
-            font-size: 11px;
-            line-height: 1.45;
-        }
-
-        /* =========================
-           BAN MODAL
-           ========================= */
-
-        .ban-modal {
-            position: fixed;
-
-            inset: 0;
-
-            z-index: 1200;
-
-            display: flex;
-
-            align-items: center;
-            justify-content: center;
-
-            padding: 16px;
-
-            background:
-                rgba(0,0,0,0.72);
-
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-        }
-
-        .ban-modal.hidden {
-            display: none;
-        }
-
-        .ban-box {
-            width:
-                min(
-                    460px,
-                    100%
-                );
-
-            padding: 24px;
-
-            border-radius: 22px;
-
-            border:
-                1px solid
-                rgba(255,100,100,0.25);
-
-            background:
-                rgba(14,23,35,0.98);
-
-            box-shadow:
-                0 30px 100px
-                rgba(0,0,0,0.55);
-        }
-
-        .ban-icon {
-            margin-bottom: 10px;
-
-            font-size: 46px;
-
-            text-align: center;
-        }
-
-        .ban-title {
-            margin-bottom: 8px;
-
-            font-size: 23px;
-            font-weight: 800;
-
-            text-align: center;
-        }
-
-        .ban-subtitle {
-            margin-bottom: 18px;
-
-            color: #91abc2;
-
-            font-size: 13px;
-            line-height: 1.45;
-
-            text-align: center;
-        }
-
-        .ban-info {
-            display: grid;
-
-            gap: 10px;
-
-            padding: 15px;
-
-            border-radius: 15px;
-
-            background:
-                rgba(255,255,255,0.055);
-
-            border:
-                1px solid
-                rgba(255,255,255,0.08);
-        }
-
-        .ban-row {
-            display: grid;
-
-            gap: 4px;
-        }
-
-        .ban-label {
-            color: #71889f;
-
-            font-size: 11px;
-        }
-
-        .ban-value {
-            color: #fff;
-
-            font-size: 14px;
-
-            line-height: 1.4;
-
-            overflow-wrap: anywhere;
-        }
-
-        .ban-close {
-            width: 100%;
-
-            min-height: 46px;
-
-            margin-top: 14px;
-
-            border-radius: 13px;
-
-            border:
-                1px solid
-                rgba(255,255,255,0.1);
-
-            background:
-                rgba(255,255,255,0.07);
-
-            color: #fff;
-
-            cursor: pointer;
-        }
-
-        .ban-close:hover {
-            background:
-                rgba(255,255,255,0.12);
-        }
-
-        /* =========================
-           REPORT MODAL
-           ========================= */
-
-        .report-modal {
-            position: fixed;
-
-            inset: 0;
-
-            z-index: 1000;
-
-            display: flex;
-
-            align-items: center;
-            justify-content: center;
-
-            padding: 16px;
-
-            background:
-                rgba(0,0,0,0.68);
-
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-        }
-
-        .report-modal.hidden {
-            display: none;
-        }
-
-        .report-box {
-            width: min(460px, 100%);
-
-            max-height:
-                calc(100vh - 32px);
-
-            overflow-y: auto;
-
-            padding: 22px;
-
-            border-radius: 22px;
-
-            border:
-                1px solid rgba(255,255,255,0.12);
-
-            background:
-                rgba(12,23,36,0.98);
-
-            box-shadow:
-                0 30px 100px
-                rgba(0,0,0,0.5);
-        }
-
-        .report-title {
-            font-size: 20px;
-            font-weight: 800;
-
-            margin-bottom: 6px;
-        }
-
-        .report-subtitle {
-            color: #91abc2;
-            font-size: 13px;
-
-            margin-bottom: 15px;
-        }
-
-        .report-reasons {
-            display: grid;
-            gap: 8px;
-        }
-
-        .report-reason {
-            width: 100%;
-
-            min-height: 44px;
-
-            padding: 10px 12px;
-
-            text-align: left;
-
-            border-radius: 12px;
-
-            border:
-                1px solid rgba(255,255,255,0.1);
-
-            background:
-                rgba(255,255,255,0.06);
-
-            color: #fff;
-
-            cursor: pointer;
-
-            transition:
-                background 0.15s ease,
-                border-color 0.15s ease,
-                transform 0.15s ease;
-        }
-
-        .report-reason:hover {
-            background:
-                rgba(255,255,255,0.1);
-
-            transform:
-                translateY(-1px);
-        }
-
-        .report-reason:active {
-            transform:
-                scale(0.99);
-        }
-
-        .report-reason.selected {
-            background:
-                rgba(255,80,80,0.2);
-
-            border-color:
-                rgba(255,110,110,0.7);
-
-            box-shadow:
-                0 0 0 2px
-                rgba(255,80,80,0.1);
-        }
-
-        .report-details {
-            width: 100%;
-
-            height: 90px;
-
-            margin-top: 12px;
-
-            padding: 11px 12px;
-
-            resize: none;
-
-            border-radius: 12px;
-
-            border:
-                1px solid rgba(255,255,255,0.1);
-
-            background:
-                rgba(0,0,0,0.22);
-
-            color: #fff;
-
-            outline: none;
-        }
-
-        .report-details:focus {
-            border-color:
-                rgba(255,110,110,0.55);
-
-            box-shadow:
-                0 0 0 2px
-                rgba(255,80,80,0.1);
-        }
-
-        .report-details::placeholder {
-            color: #71889f;
-        }
-
-        .report-actions {
-            display: grid;
-
-            grid-template-columns:
-                1fr 1.5fr;
-
-            gap: 8px;
-
-            margin-top: 12px;
-        }
-
-        .report-actions button {
-            min-height: 46px;
-
-            border-radius: 12px;
-
-            cursor: pointer;
-        }
-
-        .report-cancel {
-            border:
-                1px solid rgba(255,255,255,0.1);
-
-            background:
-                rgba(255,255,255,0.06);
-
-            color: #fff;
-        }
-
-        .report-cancel:hover {
-            background:
-                rgba(255,255,255,0.1);
-        }
-
-        .report-submit {
-            border:
-                1px solid rgba(255,100,100,0.5);
-
-            background:
-                rgba(255,70,70,0.2);
-
-            color: #fff;
-        }
-
-        .report-submit:hover:not(:disabled) {
-            background:
-                rgba(255,70,70,0.3);
-        }
-
-        .report-submit:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
-
-        /* =====================================================
-           TABLET
-           ===================================================== */
-
-        @media (max-width: 850px)
-        and (min-width: 521px) {
-
-            .header {
-                height: 64px;
-                padding: 0 16px;
-            }
-
-            .logo {
-                font-size: 23px;
-            }
-
-            .status {
-                max-width: 55%;
-
-                padding: 8px 11px;
-
-                font-size: 12px;
-            }
-
-            .rules-open-button {
-                min-height: 38px;
-
-                padding: 0 10px;
-
-                font-size: 12px;
-            }
-
-            .main {
-                width:
-                    calc(100% - 20px);
-
-                max-width: 700px;
-
-                margin:
-                    12px auto 24px;
-            }
-
-            .setup {
-                grid-template-columns: 1fr;
-
-                gap: 10px;
-
-                margin-bottom: 12px;
-            }
-
-            .setup-block {
-                padding: 14px;
-                border-radius: 18px;
-            }
-
-            .setup-title {
-                margin-bottom: 9px;
-                font-size: 13px;
-            }
-
-            .setup-block:first-child
-            .choice-group {
-
-                display: grid;
-
-                grid-template-columns:
-                    repeat(
-                        2,
-                        minmax(0, 1fr)
-                    );
-
-                gap: 8px;
-            }
-
-            .setup-block:nth-child(2)
-            .choice-group {
-
-                display: grid;
-
-                grid-template-columns:
-                    repeat(
-                        3,
-                        minmax(0, 1fr)
-                    );
-
-                gap: 8px;
-            }
-
-            .choice-button {
-                width: 100%;
-                min-height: 45px;
-
-                padding: 0 8px;
-
-                font-size: 13px;
-            }
-
-            .videos {
-                position: relative;
-
-                display: block;
-
-                width: 100%;
-                height: auto;
-            }
-
-            .videos >
-            .video-card:not(.small) {
-
-                position: relative;
-
-                width: 100%;
-
-                height:
-                    min(
-                        56svh,
-                        500px
-                    );
-
-                min-height: 320px;
-                max-height: 500px;
-            }
-
-            .videos >
-            .video-card.small {
-
-                position: absolute !important;
-
-                top: 10px !important;
-                right: 10px !important;
-
-                width: 100px !important;
-                height: 105px !important;
-
-                min-width: 100px !important;
-                min-height: 105px !important;
-
-                max-width: 100px !important;
-                max-height: 105px !important;
-
-                z-index: 50 !important;
-
-                border-radius: 14px;
-
-                border:
-                    2px solid
-                    rgba(255,255,255,0.28);
-
-                box-shadow:
-                    0 10px 30px
-                    rgba(0,0,0,0.5);
-            }
-
-            .videos >
-            .video-card.small video {
-
-                width: 100% !important;
-                height: 100% !important;
-
-                object-fit: cover !important;
-            }
-
-            .person-info {
-                left: 10px;
-                top: 10px;
-
-                max-width:
-                    calc(100% - 125px);
-
-                padding: 8px 10px;
-
-                gap: 5px;
-
-                border-radius: 13px;
-
-                font-size: 12px;
-            }
-
-            .video-label {
-                left: 10px;
-                bottom: 10px;
-
-                padding: 7px 10px;
-
-                font-size: 11px;
-            }
-
-            .video-card.small
-            .video-label {
-
-                left: 6px;
-                bottom: 6px;
-
-                padding: 4px 6px;
-
-                font-size: 9px;
-            }
-
-            .chat-panel {
-                margin-top: 12px;
-
-                padding: 13px;
-
-                border-radius: 18px;
-            }
-
-            .chat-messages {
-                height: 180px;
-            }
-
-            .chat-form {
-                display: grid;
-
-                grid-template-columns:
-                    minmax(0, 1fr)
-                    100px;
-
-                gap: 8px;
-            }
-
-            .chat-send {
-                min-width: 0;
-            }
-
-            .controls {
-                display: grid;
-
-                grid-template-columns:
-                    repeat(
-                        3,
-                        minmax(0, 1fr)
-                    );
-
-                gap: 8px;
-
-                margin-top: 12px;
-            }
-
-            .controls button {
-                width: 100%;
-
-                min-height: 50px;
-
-                padding: 0 7px;
-
-                font-size: 13px;
-            }
-
-            .primary-button {
-                grid-column:
-                    1 / -1;
-
-                min-height:
-                    54px !important;
-            }
-
-            .stop-button,
-            .report-button {
-                grid-column:
-                    1 / -1;
-            }
-        }
-
-        /* =====================================================
-           PHONE
-           ===================================================== */
-
-        @media (max-width: 520px) {
-
-            .header {
-                height: 58px;
-                padding: 0 10px;
-            }
-
-            .logo {
-                font-size: 21px;
-            }
-
-            .header-right {
-                gap: 5px;
-            }
-
-            .status {
-                max-width: 45%;
-
-                padding:
-                    7px 9px;
-
-                font-size: 10px;
-            }
-
-
-            .donation-button {
-                min-height: 34px;
-                padding: 0 9px;
-                font-size: 10px;
-                border-radius: 10px;
-            }
-
-            .rules-open-button {
-                min-height: 34px;
-
-                padding:
-                    0 8px;
-
-                font-size: 10px;
-
-                border-radius: 10px;
-            }
-
-            .main {
-                width:
-                    calc(100% - 12px);
-
-                margin:
-                    8px auto 18px;
-            }
-
-            .setup {
-                gap: 7px;
-                margin-bottom: 8px;
-            }
-
-            .setup-block {
-                padding: 10px;
-
-                border-radius: 15px;
-            }
-
-            .setup-title {
-                margin-bottom: 7px;
-                font-size: 12px;
-            }
-
-            .setup-block:first-child
-            .choice-group {
-
-                display: grid;
-
-                grid-template-columns:
-                    repeat(
-                        2,
-                        minmax(0, 1fr)
-                    );
-
-                gap: 6px;
-            }
-
-            .setup-block:nth-child(2)
-            .choice-group {
-
-                display: grid;
-
-                grid-template-columns:
-                    repeat(
-                        3,
-                        minmax(0, 1fr)
-                    );
-
-                gap: 6px;
-            }
-
-            .choice-button {
-                width: 100%;
-
-                min-height: 40px;
-
-                padding: 0 4px;
-
-                font-size: 12px;
-
-                border-radius: 11px;
-            }
-
-            .videos {
-                position: relative !important;
-
-                display: block !important;
-
-                width: 100% !important;
-
-                height: auto !important;
-
-                min-height: 0 !important;
-            }
-
-            .videos >
-            .video-card:not(.small) {
-
-                position: relative !important;
-
-                display: block !important;
-
-                width: 100% !important;
-
-                height: auto !important;
-
-                aspect-ratio:
-                    4 / 3 !important;
-
-                min-height: 0 !important;
-
-                max-height: none !important;
-
-                overflow: hidden !important;
-
-                border-radius: 17px;
-            }
-
-            .videos >
-            .video-card.small {
-
-                position: absolute !important;
-
-                display: block !important;
-
-                top: 8px !important;
-                right: 8px !important;
-
-                left: auto !important;
-                bottom: auto !important;
-
-                width: 86px !important;
-                height: 88px !important;
-
-                min-width: 86px !important;
-                min-height: 88px !important;
-
-                max-width: 86px !important;
-                max-height: 88px !important;
-
-                aspect-ratio: auto !important;
-
-                margin: 0 !important;
-
-                z-index: 100 !important;
-
-                border-radius: 12px !important;
-
-                border:
-                    2px solid
-                    rgba(255,255,255,0.28)
-                    !important;
-
-                box-shadow:
-                    0 8px 24px
-                    rgba(0,0,0,0.55);
-            }
-
-            .videos >
-            .video-card.small video {
-
-                position: absolute !important;
-
-                inset: 0 !important;
-
-                width: 100% !important;
-                height: 100% !important;
-
-                min-width: 0 !important;
-                min-height: 0 !important;
-
-                max-width: none !important;
-                max-height: none !important;
-
-                object-fit: cover !important;
-            }
-
-            .video-card:not(.small)
-            video {
-
-                position: absolute !important;
-
-                inset: 0 !important;
-
-                width: 100% !important;
-                height: 100% !important;
-
-                object-fit: cover !important;
-            }
-
-            .person-info {
-                left: 8px;
-                top: 8px;
-
-                max-width:
-                    calc(100% - 104px);
-
-                padding:
-                    6px 8px;
-
-                gap: 4px;
-
-                border-radius: 10px;
-
-                font-size: 10px;
-
-                overflow: hidden;
-            }
-
-            .person-info span {
-                white-space: nowrap;
-            }
-
-            .video-label {
-                left: 8px;
-                bottom: 8px;
-
-                padding:
-                    6px 8px;
-
-                font-size: 10px;
-            }
-
-            .video-card.small
-            .video-label {
-
-                left: 4px;
-                bottom: 4px;
-
-                padding:
-                    3px 5px;
-
-                font-size: 8px;
-            }
-
-            .placeholder-icon {
-                margin-bottom: 9px;
-                font-size: 36px;
-            }
-
-            .chat-panel {
-                margin-top: 8px;
-
-                padding: 10px;
-
-                border-radius: 15px;
-            }
-
-            .chat-header {
-                margin-bottom: 7px;
-            }
-
-            .chat-title {
-                font-size: 14px;
-            }
-
-            .chat-status {
-                max-width: 145px;
-                font-size: 10px;
-            }
-
-            .chat-messages {
-                height: 165px;
-
-                padding: 8px;
-
-                border-radius: 12px;
-            }
-
-            .chat-message {
-                max-width: 88%;
-
-                padding:
-                    8px 10px;
-
-                font-size: 13px;
-
-                border-radius: 11px;
-            }
-
-            .chat-form {
-                display: grid;
-
-                grid-template-columns:
-                    minmax(0, 1fr)
-                    76px;
-
-                gap: 6px;
-            }
-
-            .chat-input {
-                width: 100%;
-                height: 44px;
-
-                padding:
-                    0 10px;
-
-                font-size: 13px;
-
-                border-radius: 11px;
-            }
-
-            .chat-send {
-                width: 100%;
-
-                min-width: 0;
-
-                height: 44px;
-
-                padding:
-                    0 4px;
-
-                font-size: 12px;
-
-                border-radius: 11px;
-            }
-
-            .controls {
-                display: grid;
-
-                grid-template-columns:
-                    repeat(
-                        3,
-                        minmax(0, 1fr)
-                    );
-
-                gap: 6px;
-
-                margin-top: 8px;
-            }
-
-            .controls button {
-                width: 100%;
-
-                min-height: 46px;
-
-                padding:
-                    0 3px;
-
-                font-size: 11px;
-
-                border-radius: 11px;
-            }
-
-            .primary-button {
-                grid-column:
-                    1 / -1;
-
-                min-height:
-                    49px !important;
-
-                font-size:
-                    13px !important;
-            }
-
-            .stop-button,
-            .report-button {
-                grid-column:
-                    1 / -1;
-            }
-
-            .rules-box {
-                max-height:
-                    calc(100vh - 16px);
-
-                border-radius: 18px;
-            }
-
-            .rules-header {
-                padding:
-                    18px 16px 13px;
-            }
-
-            .rules-title {
-                font-size: 20px;
-            }
-
-            .rules-subtitle {
-                font-size: 11px;
-            }
-
-            .rules-content {
-                padding:
-                    16px;
-            }
-
-            .rules-content h3 {
-                font-size: 14px;
-            }
-
-            .rules-content p {
-                margin-bottom: 14px;
-
-                font-size: 12px;
-                line-height: 1.5;
-            }
-
-            .rules-footer {
-                padding:
-                    13px 16px 16px;
-            }
-
-            .rules-check {
-                font-size: 12px;
-            }
-
-            .rules-continue {
-                min-height: 47px;
-
-                font-size: 13px;
-            }
-
-            .report-box,
-            .ban-box {
-                padding: 16px;
-
-                border-radius: 18px;
-            }
-
-            .report-title,
-            .ban-title {
-                font-size: 18px;
-            }
-
-            .report-subtitle,
-            .ban-subtitle {
-                font-size: 12px;
-            }
-
-            .report-actions {
-                grid-template-columns:
-                    1fr;
-            }
-
-            .report-reason {
-                min-height: 42px;
-                font-size: 12px;
-            }
-
-            .report-details {
-                height: 82px;
-                font-size: 12px;
-            }
-        }
-
-        /* =====================================================
-           VERY SMALL PHONE
-           ===================================================== */
-
-        @media (max-width: 370px) {
-
-            .header {
-                height: 55px;
-            }
-
-            .logo {
-                font-size: 19px;
-            }
-
-            .status {
-                max-width: 38%;
-
-                font-size: 9px;
-            }
-
-
-            .donation-button {
-                padding: 0 6px;
-                font-size: 9px;
-            }
-
-            .rules-open-button {
-                padding: 0 6px;
-                font-size: 9px;
-            }
-
-            .choice-button {
-                min-height: 38px;
-                font-size: 11px;
-            }
-
-            .videos >
-            .video-card:not(.small) {
-                aspect-ratio:
-                    4 / 3 !important;
-            }
-
-            .videos >
-            .video-card.small {
-
-                width: 76px !important;
-                height: 78px !important;
-
-                min-width: 76px !important;
-                min-height: 78px !important;
-
-                max-width: 76px !important;
-                max-height: 78px !important;
-            }
-
-            .person-info {
-                max-width:
-                    calc(100% - 92px);
-
-                font-size: 9px;
-            }
-
-            .chat-messages {
-                height: 145px;
-            }
-
-            .chat-form {
-                grid-template-columns:
-                    minmax(0, 1fr)
-                    66px;
-            }
-
-            .chat-input {
-                font-size: 12px;
-            }
-
-            .chat-send {
-                font-size: 10px;
-            }
-
-            .controls button {
-                min-height: 44px;
-                font-size: 10px;
-            }
-
-            .primary-button {
-                font-size:
-                    12px !important;
-            }
-
-            .report-box,
-            .ban-box {
-                padding: 13px;
-            }
-        }
-    
-        /* =========================
-           LANGUAGE SWITCHER
-           ========================= */
-
-        .language-button {
-            flex: 0 0 auto;
-            min-height: 40px;
-            padding: 9px 12px;
-            border-radius: 999px;
-            border: 1px solid rgba(255,255,255,0.10);
-            background: rgba(255,255,255,0.07);
-            color: #fff;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 700;
-            transition: background 0.2s ease, transform 0.2s ease;
-        }
-
-        .gender-symbol {
-            font-family: Arial, Helvetica, sans-serif;
-            font-weight: 800;
-            font-size: 1.05em;
-            display: inline-block;
-            line-height: 1;
-        }
-
-        .gender-symbol.male {
-            color: #4da6ff;
-            text-shadow: 0 0 7px rgba(77,166,255,0.28);
-        }
-
-        .gender-symbol.female {
-            color: #ff69b4;
-            text-shadow: 0 0 7px rgba(255,105,180,0.25);
-        }
-
-        .language-button:hover {
-            background: rgba(255,255,255,0.12);
-        }
-
-        .language-button:active {
-            transform: scale(0.97);
-        }
-
-    </style>
-</head>
-
-<body>
-
-<div class="app">
-
-    <header class="header">
-
-        <div class="logo">
-            IceChat
-        </div>
-
-        <div class="header-right">
-
-            <div
-                id="status"
-                class="status">
-                Готов к поиску
-            </div>
-
-            <a
-                class="donation-button"
-                href="https://www.donationalerts.com/r/icechat"
-                target="_blank"
-                rel="noopener noreferrer">
-                💎 Поддержать Ice Chat
-            </a>
-
-            <button
-                id="rulesOpenButton"
-                type="button"
-                class="rules-open-button">
-                Правила
-            </button>
-
-            <button
-                id="languageButton"
-                type="button"
-                class="language-button"
-                aria-label="Switch language">
-                EN
-            </button>
-
-        </div>
-
-    </header>
-
-    <main class="main">
-
-        <section class="setup">
-
-            <div class="setup-block">
-
-                <div class="setup-title">
-                    Ваш пол
-                </div>
-
-                <div class="choice-group">
-
-                    <button
-                        type="button"
-                        class="choice-button"
-                        data-my-gender="male">
-                        <span class="gender-symbol male">♂</span> Мужчина
-                    </button>
-
-                    <button
-                        type="button"
-                        class="choice-button"
-                        data-my-gender="female">
-                        <span class="gender-symbol female">♀</span> Женщина
-                    </button>
-
-                </div>
-            </div>
-
-            <div class="setup-block">
-
-                <div class="setup-title">
-                    Искать собеседника
-                </div>
-
-                <div class="choice-group">
-
-                    <button
-                        type="button"
-                        class="choice-button"
-                        data-search-gender="male">
-                        <span class="gender-symbol male">♂</span> Мужчина
-                    </button>
-
-                    <button
-                        type="button"
-                        class="choice-button"
-                        data-search-gender="female">
-                        <span class="gender-symbol female">♀</span> Женщина
-                    </button>
-
-                    <button
-                        type="button"
-                        class="choice-button selected"
-                        data-search-gender="any">
-                        Оба
-                    </button>
-
-                </div>
-            </div>
-
-        </section>
-
-        <section class="videos">
-
-            <div class="video-card">
-
-                <video
-                    id="remoteVideo"
-                    autoplay
-                    playsinline>
-                </video>
-
-                <div
-                    id="remotePlaceholder"
-                    class="video-placeholder">
-
-                    <div>
-
-                        <div class="placeholder-icon">
-                            👤
-                        </div>
-
-                        <div>
-                            Найдите собеседника
-                        </div>
-
-                    </div>
-
-                </div>
-
-                <div
-                    id="remoteInfo"
-                    class="person-info hidden">
-
-                    <span id="remoteGender">
-                        👤 Собеседник
-                    </span>
-
-                    <span>·</span>
-
-                    <span id="remoteCountry">
-                        🌐 UN
-                    </span>
-
-                    <span>·</span>
-
-                    <span
-                        id="callTimer"
-                        class="timer">
-                        00:00
-                    </span>
-
-                </div>
-
-                <div class="video-label">
-                    Собеседник
-                </div>
-
-            </div>
-
-            <div class="video-card small">
-
-                <video
-                    id="localVideo"
-                    autoplay
-                    muted
-                    playsinline>
-                </video>
-
-                <div class="video-label">
-                    Вы
-                </div>
-
-            </div>
-
-        </section>
-
-        <section class="chat-panel">
-
-            <div class="chat-header">
-
-                <div class="chat-title">
-                    💬 Чат
-                </div>
-
-                <div
-                    id="chatStatus"
-                    class="chat-status">
-                    Нет соединения
-                </div>
-
-            </div>
-
-            <div
-                id="chatMessages"
-                class="chat-messages">
-
-                <div
-                    id="chatEmpty"
-                    class="chat-empty">
-                    Здесь появятся сообщения
-                </div>
-
-            </div>
-
-            <form
-                id="chatForm"
-                class="chat-form">
-
-                <input
-                    id="chatInput"
-                    class="chat-input"
-                    type="text"
-                    maxlength="500"
-                    autocomplete="off"
-                    placeholder="Напишите сообщение..."
-                    disabled
-                >
-
-                <button
-                    id="chatSend"
-                    class="chat-send"
-                    type="submit"
-                    disabled>
-                    Отправить
-                </button>
-
-            </form>
-
-        </section>
-
-        <section class="controls">
-
-            <button
-                id="joinButton"
-                type="button"
-                class="primary-button">
-                🔎 Найти собеседника
-            </button>
-
-            <button
-                id="leaveButton"
-                type="button"
-                class="stop-button"
-                disabled>
-                ⛔ STOP
-            </button>
-
-            <button
-                id="micButton"
-                type="button"
-                disabled>
-                🎤 Микрофон
-            </button>
-
-            <button
-                id="cameraButton"
-                type="button"
-                disabled>
-                📷 Камера
-            </button>
-
-            <button
-                id="cameraSwitchButton"
-                type="button"
-                class="camera-switch-button"
-                disabled>
-                🔄 Камера
-            </button>
-
-            <button
-                id="reportButton"
-                type="button"
-                class="report-button"
-                disabled>
-                🚩 Пожаловаться
-            </button>
-
-        </section>
-
-    </main>
-
-</div>
-
-<!-- =========================
-     RULES MODAL
-     ========================= -->
-
-<div
-    id="rulesModal"
-    class="rules-modal entry-gate hidden">
-
-    <div class="rules-box">
-
-        <div class="rules-header">
-
-            <div class="rules-title">
-                📋 Правила IceChat
-            </div>
-
-            <div class="rules-subtitle">
-                Ознакомьтесь с правилами перед входом в видеочат. IceChat доступен только пользователям 18+.
-            </div>
-
-        </div>
-
-        <div class="rules-content">
-
-            <h3>Добро пожаловать в IceChat! 👋</h3>
-            <p><strong>IceChat</strong> — случайная видеочат-рулетка, которая позволяет общаться с людьми из разных стран и находить новых собеседников.</p>
-
-            <h3>🧊 Почему IceChat?</h3>
-            <p>Мы хотим сделать случайное общение простым и доступным. Поэтому <strong>выбор пола собеседника в IceChat полностью бесплатный</strong>.</p>
-            <p>В отличие от многих других сервисов, где поиск по полу может быть доступен только за деньги, в <strong>IceChat</strong> эта возможность предоставляется бесплатно, без подписки и дополнительных платежей.</p>
-
-            <h3>📋 Правила IceChat</h3>
-            <p><strong>1. IceChat предназначен только для пользователей в возрасте 18 лет и старше.</strong> Используя сервис и нажимая кнопку «Продолжить», вы подтверждаете, что вам исполнилось 18 лет. Лицам младше 18 лет запрещено использовать IceChat.</p>
-            <p><strong>2. Уважайте собеседников.</strong> Запрещены оскорбления, травля, угрозы, преследование, намеренное унижение и иное агрессивное поведение.</p>
-            <p><strong>3. Запрещён непристойный контент.</strong> Нельзя демонстрировать или распространять сексуальный, порнографический или иной явно неприемлемый контент.</p>
-            <p><strong>4. Запрещено сексуальное поведение с участием несовершеннолетних.</strong> Любые сексуальные действия, предложения или демонстрация сексуального контента несовершеннолетним запрещены.</p>
-            <p><strong>5. Не пытайтесь обходить возрастные ограничения сервиса или предоставлять заведомо недостоверную информацию о возрасте.</strong></p>
-            <p><strong>6. Не записывайте и не распространяйте видео собеседников без их согласия.</strong> Запрещено использовать запись разговора для травли, шантажа, преследования или публичного распространения.</p>
-            <p><strong>7. Запрещён спам.</strong> Не допускаются массовая рассылка сообщений, навязчивая реклама, повторяющиеся сообщения, злоупотребление ссылками и иные действия, мешающие нормальному общению.</p>
-            <p><strong>8. Запрещено выдавать себя за другого человека.</strong> Нельзя намеренно представляться другим пользователем, публичной персоной или представителем организации с целью введения собеседника в заблуждение.</p>
-            <p><strong>9. Не распространяйте персональные данные.</strong> Не публикуйте чужие и не требуйте от собеседников пароли, адреса проживания, номера телефонов, документы, данные банковских карт и другую чувствительную информацию.</p>
-            <p><strong>10. Запрещены экстремизм, пропаганда ненависти и оправдание преступных идеологий.</strong> Не допускаются призывы к насилию, пропаганда терроризма, нацизма и иных человеконенавистнических идеологий, разжигание ненависти или вражды, а также поддержка, популяризация или героизация подобных действий, организаций и идеологий.</p>
-            <p><strong>11. Запрещено опасное и незаконное поведение.</strong> IceChat нельзя использовать для угроз причинения вреда, вовлечения других людей в опасные действия, совершения или организации незаконной деятельности.</p>
-            <p><strong>12. Не нарушайте работу сервиса.</strong> Запрещены попытки взлома, обход технических ограничений и блокировок, автоматизированный спам, атаки на сервер и иные действия, направленные на нарушение работы IceChat.</p>
-            <p><strong>13. Используйте жалобы по назначению.</strong> Не отправляйте заведомо ложные, массовые или направленные на злоупотребление системой жалобы.</p>
-            <p><strong>14. Жалоба не означает автоматический бан.</strong> Каждое обращение рассматривается модерацией с учётом контекста, обстоятельств и характера нарушения. По итогам рассмотрения может быть вынесено предупреждение или применено ограничение доступа.</p>
-            <p><strong>15. Срок блокировки определяется модерацией.</strong> Продолжительность ограничения зависит от тяжести нарушения, его последствий, повторности и других обстоятельств.</p>
-            <p><strong>16. Блокировка может быть временной или бессрочной.</strong> В зависимости от ситуации могут применяться различные сроки ограничения доступа, вплоть до постоянной блокировки.</p>
-            <p><strong>17. Не пытайтесь обходить блокировку.</strong> Создание новых аккаунтов или использование других способов для обхода применённых ограничений может привести к дополнительным мерам со стороны администрации.</p>
-            <p><strong>18. Администрация может ограничить доступ при серьёзных нарушениях.</strong> В случае грубого нарушения правил пользователь может получить ограничение или блокировку без предварительного предупреждения.</p>
-            <p><strong>19. IceChat не может заранее контролировать поведение каждого собеседника.</strong> Поскольку сервис работает по принципу случайного подбора, вам может попасться пользователь, нарушающий правила. В такой ситуации прекратите разговор, нажмите <strong>STOP</strong> и воспользуйтесь функцией жалобы.</p>
-            <p><strong>20. Пользователь несёт ответственность за свои действия.</strong> Администрация IceChat не одобряет и не поддерживает нарушения правил, совершаемые пользователями сервиса.</p>
-            <p><strong>21. Правила могут изменяться.</strong> Администрация вправе обновлять настоящие правила, уточнять отдельные положения и вводить дополнительные ограничения для обеспечения безопасности и нормальной работы IceChat.</p>
-            <p><strong>22. Запрещено использовать сервис для мошенничества.</strong> Нельзя обманывать пользователей с целью получения денег, доступа к аккаунтам, кодов подтверждения, персональных данных или иной выгоды.</p>
-            <p><strong>23. Не выдавайте себя за администрацию IceChat.</strong> Запрещено представляться сотрудником, модератором или официальным представителем IceChat без соответствующих полномочий.</p>
-            <p><strong>24. Не гарантируется постоянная доступность сервиса.</strong> Работа IceChat может временно ограничиваться из-за технических работ, обновлений, сбоев или других обстоятельств.</p>
-            <p><strong>25. Пользователь может прекратить общение в любой момент.</strong> Если разговор вызывает дискомфорт, прекратите его с помощью кнопки <strong>STOP</strong> или перейдите к следующему собеседнику.</p>
-            <p><strong>26. Не используйте IceChat для навязчивого сбора контактов.</strong> Запрещено массово или навязчиво требовать у пользователей номера телефонов, аккаунты в социальных сетях или другие контактные данные.</p>
-            <p><strong>27. Администрация вправе принимать меры для обеспечения безопасности сервиса.</strong> При наличии оснований администрация может ограничивать доступ пользователей и принимать разумные меры для предотвращения нарушений и обеспечения безопасности IceChat.</p>
-
-            <p class="rules-gate-note">Нажимая «Продолжить», вы подтверждаете, что вам исполнилось 18 лет, вы ознакомились с правилами IceChat и обязуетесь их соблюдать.</p>
-
-        </div>
-
-        <div class="rules-footer">
-
-            <label class="rules-check">
-
-                <input
-                    id="rulesCheckbox"
-                    type="checkbox"
-                >
-
-                <span>
-                    Я ознакомился с правилами и мне исполнилось 18 лет.
-                </span>
-
-            </label>
-
-            <button
-                id="rulesContinue"
-                type="button"
-                class="rules-continue"
-                disabled>
-                Продолжить
-            </button>
-
-        </div>
-
-    </div>
-
-</div>
-
-<!-- =========================
-     BAN MODAL
-     ========================= -->
-
-<div
-    id="banModal"
-    class="ban-modal hidden">
-
-    <div class="ban-box">
-
-        <div class="ban-icon">
-            ⛔
-        </div>
-
-        <div class="ban-title">
-            Доступ заблокирован
-        </div>
-
-        <div class="ban-subtitle">
-            Вы не можете пользоваться поиском собеседников
-            до окончания блокировки.
-        </div>
-
-        <div class="ban-info">
-
-            <div class="ban-row">
-
-                <div class="ban-label">
-                    Причина
-                </div>
-
-                <div
-                    id="banReason"
-                    class="ban-value">
-                    —
-                </div>
-
-            </div>
-
-            <div class="ban-row">
-
-                <div class="ban-label">
-                    Срок
-                </div>
-
-                <div
-                    id="banDuration"
-                    class="ban-value">
-                    —
-                </div>
-
-            </div>
-
-            <div
-                id="banUntilRow"
-                class="ban-row">
-
-                <div class="ban-label">
-                    Заблокирован до
-                </div>
-
-                <div
-                    id="banUntil"
-                    class="ban-value">
-                    —
-                </div>
-
-            </div>
-
-        </div>
-
-        <button
-            id="banClose"
-            type="button"
-            class="ban-close">
-            Понятно
-        </button>
-
-    </div>
-
-</div>
-
-<!-- =========================
-     REPORT MODAL
-     ========================= -->
-
-<div
-    id="reportModal"
-    class="report-modal hidden">
-
-    <div class="report-box">
-
-        <div class="report-title">
-            🚩 Пожаловаться
-        </div>
-
-        <div class="report-subtitle">
-            Выберите причину жалобы
-        </div>
-
-        <div class="report-reasons">
-
-            <button
-                type="button"
-                class="report-reason"
-                data-reason="Оскорбления или токсичное поведение">
-                Оскорбления или токсичное поведение
-            </button>
-
-            <button
-                type="button"
-                class="report-reason"
-                data-reason="Непристойный контент">
-                Непристойный контент
-            </button>
-
-            <button
-                type="button"
-                class="report-reason"
-                data-reason="Спам или реклама">
-                Спам или реклама
-            </button>
-
-            <button
-                type="button"
-                class="report-reason"
-                data-reason="Опасное или незаконное поведение">
-                Опасное или незаконное поведение
-            </button>
-
-            <button
-                type="button"
-                class="report-reason"
-                data-reason="Другое">
-                Другое
-            </button>
-
-        </div>
-
-        <textarea
-            id="reportDetails"
-            class="report-details"
-            maxlength="1000"
-            placeholder="Дополнительная информация (необязательно)"></textarea>
-
-        <div class="report-actions">
-
-            <button
-                id="reportCancel"
-                type="button"
-                class="report-cancel">
-                Отмена
-            </button>
-
-            <button
-                id="reportSubmit"
-                type="button"
-                class="report-submit"
-                disabled>
-                Отправить жалобу
-            </button>
-
-        </div>
-
-    </div>
-
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
-
-<script>
-document.addEventListener(
-    "DOMContentLoaded",
-    function () {
-
-        console.log(
-            "ICECHAT INLINE APP START"
+    } catch (error) {
+        console.error(
+            "Ошибка чтения stats.json:",
+            error.message
         );
 
-        if (!window.LivekitClient) {
+        return getDefaultStats();
+    }
+}
 
-            console.error(
-                "LiveKit Client не загрузился"
+function writeStats(stats) {
+    try {
+        fs.writeFileSync(
+            STATS_FILE,
+            JSON.stringify(
+                stats,
+                null,
+                2
+            ),
+            "utf8"
+        );
+    } catch (error) {
+        console.error(
+            "Ошибка записи stats.json:",
+            error.message
+        );
+    }
+}
+
+function ensureDailyStats(stats) {
+    const key =
+        todayKey();
+
+    if (!stats.daily[key]) {
+        stats.daily[key] = {
+            searchesStarted: 0,
+            searchesMatched: 0,
+            searchesCancelled: 0,
+            searchesTimedOut: 0,
+            sessionsCompleted: 0
+        };
+    }
+
+    return stats.daily[key];
+}
+
+function recordUser(
+    userId,
+    data = {}
+) {
+    if (!userId) {
+        return;
+    }
+
+    const stats =
+        readStats();
+
+    const now =
+        new Date().toISOString();
+
+    if (!stats.users[userId]) {
+        stats.users[userId] = {
+            firstSeenAt: now,
+            lastSeenAt: now,
+
+            gender:
+                data.gender || null,
+
+            searchGender:
+                data.searchGender || null,
+
+            countryCode:
+                data.countryCode || "UN",
+
+            countryName:
+                data.countryName || "Неизвестно"
+        };
+    } else {
+        const user =
+            stats.users[userId];
+
+        user.lastSeenAt = now;
+
+        if (data.gender) {
+            user.gender =
+                data.gender;
+        }
+
+        if (data.searchGender) {
+            user.searchGender =
+                data.searchGender;
+        }
+
+        if (data.countryCode) {
+            user.countryCode =
+                data.countryCode;
+        }
+
+        if (data.countryName) {
+            user.countryName =
+                data.countryName;
+        }
+    }
+
+    writeStats(stats);
+}
+
+function incrementSearchStarted() {
+    const stats =
+        readStats();
+
+    stats.totals.searchesStarted++;
+
+    const daily =
+        ensureDailyStats(stats);
+
+    daily.searchesStarted++;
+
+    writeStats(stats);
+}
+
+function incrementSearchMatched() {
+    const stats =
+        readStats();
+
+    stats.totals.searchesMatched++;
+
+    const daily =
+        ensureDailyStats(stats);
+
+    daily.searchesMatched++;
+
+    writeStats(stats);
+}
+
+function incrementSearchCancelled() {
+    const stats =
+        readStats();
+
+    stats.totals.searchesCancelled++;
+
+    const daily =
+        ensureDailyStats(stats);
+
+    daily.searchesCancelled++;
+
+    writeStats(stats);
+}
+
+function incrementSearchTimedOut() {
+    const stats =
+        readStats();
+
+    stats.totals.searchesTimedOut++;
+
+    const daily =
+        ensureDailyStats(stats);
+
+    daily.searchesTimedOut++;
+
+    writeStats(stats);
+}
+
+function recordSession(
+    roomName,
+    matchData
+) {
+    if (!matchData) {
+        return;
+    }
+
+    if (matchData.analyticsRecorded) {
+        return;
+    }
+
+    matchData.analyticsRecorded =
+        true;
+
+    const stats =
+        readStats();
+
+    const startedAt =
+        matchData.startedAt ||
+        matchData.createdAt ||
+        Date.now();
+
+    const endedAt =
+        Date.now();
+
+    const durationMs =
+        Math.max(
+            0,
+            endedAt - startedAt
+        );
+
+    stats.totals.sessionsCompleted++;
+
+    stats.totals.totalCallDurationMs +=
+        durationMs;
+
+    if (
+        durationMs >
+        stats.totals.longestCallDurationMs
+    ) {
+        stats.totals.longestCallDurationMs =
+            durationMs;
+    }
+
+    if (
+        durationMs <
+        10 * 1000
+    ) {
+        stats.totals.callsUnder10Seconds++;
+    }
+
+    const daily =
+        ensureDailyStats(stats);
+
+    daily.sessionsCompleted++;
+
+    stats.sessions.push({
+        roomName:
+            roomName,
+
+        startedAt:
+            new Date(
+                startedAt
+            ).toISOString(),
+
+        endedAt:
+            new Date(
+                endedAt
+            ).toISOString(),
+
+        durationMs:
+            durationMs,
+
+        userIds:
+            Array.isArray(
+                matchData.userIds
+            )
+                ? matchData.userIds
+                : []
+    });
+
+    /*
+     * Не даём stats.json бесконечно расти.
+     * Храним последние 5000 разговоров.
+     */
+    if (
+        stats.sessions.length >
+        5000
+    ) {
+        stats.sessions =
+            stats.sessions.slice(
+                -5000
             );
+    }
 
+    writeStats(stats);
+}
+
+/* =========================
+   COOKIES
+   ========================= */
+
+function parseCookies(req) {
+    const header = req.headers.cookie || "";
+    const cookies = {};
+
+    header.split(";").forEach(function (part) {
+        const index = part.indexOf("=");
+
+        if (index === -1) {
             return;
         }
 
-        var Room =
-            LivekitClient.Room;
+        const key = part.slice(0, index).trim();
+        const rawValue = part.slice(index + 1).trim();
 
-        var RoomEvent =
-            LivekitClient.RoomEvent;
-
-        var Track =
-            LivekitClient.Track;
-
-        var createLocalVideoTrack =
-            LivekitClient
-                .createLocalVideoTrack;
-
-        var createLocalAudioTrack =
-            LivekitClient
-                .createLocalAudioTrack;
-
-        var statusEl =
-            document.getElementById(
-                "status"
-            );
-
-        var rulesModal =
-            document.getElementById(
-                "rulesModal"
-            );
-
-        var rulesCheckbox =
-            document.getElementById(
-                "rulesCheckbox"
-            );
-
-        var rulesContinue =
-            document.getElementById(
-                "rulesContinue"
-            );
-
-        var rulesOpenButton =
-            document.getElementById(
-                "rulesOpenButton"
-            );
-
-        var joinButton =
-            document.getElementById(
-                "joinButton"
-            );
-
-        var leaveButton =
-            document.getElementById(
-                "leaveButton"
-            );
-
-        var micButton =
-            document.getElementById(
-                "micButton"
-            );
-
-        var cameraButton =
-            document.getElementById(
-                "cameraButton"
-            );
-
-        var cameraSwitchButton =
-            document.getElementById(
-                "cameraSwitchButton"
-            );
-
-        var reportButton =
-            document.getElementById(
-                "reportButton"
-            );
-
-        var banModal =
-            document.getElementById(
-                "banModal"
-            );
-
-        var banReason =
-            document.getElementById(
-                "banReason"
-            );
-
-        var banDuration =
-            document.getElementById(
-                "banDuration"
-            );
-
-        var banUntil =
-            document.getElementById(
-                "banUntil"
-            );
-
-        var banUntilRow =
-            document.getElementById(
-                "banUntilRow"
-            );
-
-        var banClose =
-            document.getElementById(
-                "banClose"
-            );
-
-        var reportModal =
-            document.getElementById(
-                "reportModal"
-            );
-
-        var reportCancel =
-            document.getElementById(
-                "reportCancel"
-            );
-
-        var reportSubmit =
-            document.getElementById(
-                "reportSubmit"
-            );
-
-        var reportDetails =
-            document.getElementById(
-                "reportDetails"
-            );
-
-        var localVideo =
-            document.getElementById(
-                "localVideo"
-            );
-
-        var remoteVideo =
-            document.getElementById(
-                "remoteVideo"
-            );
-
-        var remotePlaceholder =
-            document.getElementById(
-                "remotePlaceholder"
-            );
-
-        var remoteInfo =
-            document.getElementById(
-                "remoteInfo"
-            );
-
-        var remoteGender =
-            document.getElementById(
-                "remoteGender"
-            );
-
-        var remoteCountry =
-            document.getElementById(
-                "remoteCountry"
-            );
-
-        var callTimer =
-            document.getElementById(
-                "callTimer"
-            );
-
-        /* =========================
-           RULES
-           ========================= */
-
-        function openRules() {
-
-            rulesModal.classList.remove(
-                "hidden"
-            );
-
-            rulesCheckbox.checked =
-                false;
-
-            rulesContinue.disabled =
-                true;
+        try {
+            cookies[key] = decodeURIComponent(rawValue);
+        } catch (error) {
+            cookies[key] = rawValue;
         }
+    });
 
-        function closeRules() {
+    return cookies;
+}
 
-            if (
-                !rulesCheckbox.checked
-            ) {
-                return;
-            }
+function setCookie(
+    res,
+    name,
+    value,
+    options = {}
+) {
+    let cookie =
+        `${name}=${encodeURIComponent(value)}`;
 
-            rulesModal.classList.add(
-                "hidden"
-            );
-        }
+    cookie += "; Path=/";
 
-        rulesCheckbox.addEventListener(
-            "change",
-            function () {
+    if (
+        options.httpOnly !== false
+    ) {
+        cookie += "; HttpOnly";
+    }
 
-                rulesContinue.disabled =
-                    !rulesCheckbox.checked;
+    if (options.sameSite) {
+        cookie +=
+            `; SameSite=${options.sameSite}`;
+    }
+
+    if (
+        options.maxAge !== undefined
+    ) {
+        cookie +=
+            `; Max-Age=${options.maxAge}`;
+    }
+
+    if (options.secure) {
+        cookie += "; Secure";
+    }
+
+    res.append(
+        "Set-Cookie",
+        cookie
+    );
+}
+
+function clearCookie(
+    res,
+    name
+) {
+    res.append(
+        "Set-Cookie",
+        `${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict`
+    );
+}
+
+/* =========================
+   USER ID
+   ========================= */
+
+function ensureUserId(
+    req,
+    res
+) {
+    const cookies =
+        parseCookies(req);
+
+    let userId =
+        cookies.icechat_uid;
+
+    if (
+        !userId ||
+        !/^usr_[a-f0-9]{24}$/.test(
+            userId
+        )
+    ) {
+        userId =
+            randomId("usr_");
+
+        setCookie(
+            res,
+            "icechat_uid",
+            userId,
+            {
+                httpOnly: true,
+                sameSite: "Lax",
+                maxAge:
+                    60 *
+                    60 *
+                    24 *
+                    365 *
+                    5
             }
         );
+    }
 
-        rulesContinue.addEventListener(
-            "click",
-            function () {
+    return userId;
+}
 
+function getUserId(req) {
+    const cookies =
+        parseCookies(req);
+
+    const userId =
+        cookies.icechat_uid;
+
+    if (
+        !userId ||
+        !/^usr_[a-f0-9]{24}$/.test(
+            userId
+        )
+    ) {
+        return null;
+    }
+
+    return userId;
+}
+
+/* =========================
+   JSON STORAGE
+   ========================= */
+
+function readJsonArray(
+    file
+) {
+    try {
+        if (!fs.existsSync(file)) {
+            return [];
+        }
+
+        const data =
+            fs.readFileSync(
+                file,
+                "utf8"
+            );
+
+        const parsed =
+            JSON.parse(data);
+
+        return Array.isArray(parsed)
+            ? parsed
+            : [];
+
+    } catch (error) {
+        console.error(
+            `Ошибка чтения ${path.basename(file)}:`,
+            error.message
+        );
+
+        return [];
+    }
+}
+
+function writeJsonArray(
+    file,
+    data
+) {
+    fs.writeFileSync(
+        file,
+        JSON.stringify(
+            data,
+            null,
+            2
+        ),
+        "utf8"
+    );
+}
+
+function readReports() {
+    return readJsonArray(
+        REPORTS_FILE
+    );
+}
+
+function writeReports(
+    reports
+) {
+    writeJsonArray(
+        REPORTS_FILE,
+        reports
+    );
+}
+
+function readBans() {
+    return readJsonArray(
+        BANS_FILE
+    );
+}
+
+function writeBans(
+    bans
+) {
+    writeJsonArray(
+        BANS_FILE,
+        bans
+    );
+}
+
+/* =========================
+   BAN CHECK
+   ========================= */
+
+function getActiveBan(
+    userId
+) {
+    if (!userId) {
+        return null;
+    }
+
+    const bans =
+        readBans();
+
+    let changed = false;
+
+    const now =
+        Date.now();
+
+    const activeBans =
+        bans.filter(
+            function (ban) {
                 if (
-                    !rulesCheckbox.checked
+                    ban.expiresAt &&
+                    new Date(
+                        ban.expiresAt
+                    ).getTime() <= now
                 ) {
-                    return;
+                    changed = true;
+                    return false;
                 }
 
-                rulesModal.classList.add(
-                    "hidden"
+                return true;
+            }
+        );
+
+    if (changed) {
+        writeBans(
+            activeBans
+        );
+    }
+
+    return (
+        activeBans.find(
+            function (ban) {
+                return (
+                    ban.userId ===
+                    userId
                 );
             }
+        ) || null
+    );
+}
+
+/* =========================
+   ADMIN AUTH
+   ========================= */
+
+function requireAdmin(
+    req,
+    res,
+    next
+) {
+    const cookies =
+        parseCookies(req);
+
+    const sessionId =
+        cookies.icechat_admin;
+
+    if (
+        !sessionId ||
+        !adminSessions.has(
+            sessionId
+        )
+    ) {
+        return res.status(401).json({
+            error:
+                "Admin authorization required"
+        });
+    }
+
+    next();
+}
+
+/* =========================
+   IP / COUNTRY
+   ========================= */
+
+function getClientIp(req) {
+    const forwarded =
+        req.headers[
+            "x-forwarded-for"
+        ];
+
+    if (forwarded) {
+        return forwarded
+            .split(",")[0]
+            .trim();
+    }
+
+    return (
+        req.headers[
+            "cf-connecting-ip"
+        ] ||
+        req.socket.remoteAddress ||
+        ""
+    )
+        .replace(
+            "::ffff:",
+            ""
+        )
+        .trim();
+}
+
+function countryName(code) {
+    const names = {
+        DE: "Германия",
+        RU: "Российская федерация",
+        US: "США",
+        GB: "Великобритания",
+        FR: "Франция",
+        IT: "Италия",
+        ES: "Испания",
+        PL: "Польша",
+        UA: "Украина",
+        KZ: "Казахстан",
+        BY: "Беларусь",
+        NL: "Нидерланды",
+        BE: "Бельгия",
+        AT: "Австрия",
+        CH: "Швейцария",
+        CZ: "Чехия",
+        SE: "Швеция",
+        NO: "Норвегия",
+        FI: "Финляндия",
+        DK: "Дания",
+        CA: "Канада",
+        AU: "Австралия",
+        JP: "Япония",
+        KR: "Южная Корея",
+        CN: "Китай",
+        TR: "Турция",
+        IN: "Индия",
+        BR: "Бразилия",
+        MX: "Мексика"
+    };
+
+    return (
+        names[code] ||
+        code ||
+        "Неизвестно"
+    );
+}
+
+async function getCountry(
+    req
+) {
+    if (
+        req.headers[
+            "cf-ipcountry"
+        ]
+    ) {
+        const code =
+            req.headers[
+                "cf-ipcountry"
+            ].toUpperCase();
+
+        if (code !== "XX") {
+            return {
+                code:
+                    code,
+
+                name:
+                    countryName(
+                        code
+                    )
+            };
+        }
+    }
+
+    if (
+        req.headers[
+            "x-country-code"
+        ]
+    ) {
+        const code =
+            req.headers[
+                "x-country-code"
+            ].toUpperCase();
+
+        return {
+            code:
+                code,
+
+            name:
+                countryName(
+                    code
+                )
+        };
+    }
+
+    const ip =
+        getClientIp(req);
+
+    if (
+        !ip ||
+        ip === "127.0.0.1" ||
+        ip === "::1"
+    ) {
+        return {
+            code: "UN",
+            name: "Неизвестно"
+        };
+    }
+
+    try {
+        const response =
+            await fetch(
+                `https://ipapi.co/${encodeURIComponent(ip)}/json/`
+            );
+
+        if (!response.ok) {
+            throw new Error(
+                "Geo request failed"
+            );
+        }
+
+        const data =
+            await response.json();
+
+        const code =
+            String(
+                data.country_code ||
+                "UN"
+            ).toUpperCase();
+
+        return {
+            code:
+                code,
+
+            name:
+                data.country_name ||
+                countryName(
+                    code
+                )
+        };
+
+    } catch (error) {
+        console.log(
+            "Не удалось определить страну:",
+            error.message
         );
 
-        rulesOpenButton.addEventListener(
-            "click",
-            function () {
+        return {
+            code: "UN",
+            name: "Неизвестно"
+        };
+    }
+}
 
-                openRules();
-            }
+/* =========================
+   LIVEKIT TRACKING
+   ========================= */
+
+function registerLiveKitParticipant(
+    roomName,
+    userId,
+    identity
+) {
+    if (
+        !liveKitParticipants.has(
+            roomName
+        )
+    ) {
+        liveKitParticipants.set(
+            roomName,
+            new Map()
+        );
+    }
+
+    const roomUsers =
+        liveKitParticipants.get(
+            roomName
         );
 
-        function initRules() {
+    if (
+        !roomUsers.has(userId)
+    ) {
+        roomUsers.set(
+            userId,
+            new Set()
+        );
+    }
 
-            /* The rules gate is shown on every new page load. */
-            rulesCheckbox.checked = false;
-            rulesContinue.disabled = true;
-            rulesModal.classList.remove("hidden");
+    roomUsers
+        .get(userId)
+        .add(identity);
+}
+
+function getLiveKitIdentities(
+    roomName,
+    userId
+) {
+    const roomUsers =
+        liveKitParticipants.get(
+            roomName
+        );
+
+    if (!roomUsers) {
+        return [];
+    }
+
+    const identities =
+        roomUsers.get(userId);
+
+    if (!identities) {
+        return [];
+    }
+
+    return Array.from(
+        identities
+    );
+}
+
+function removeTrackedIdentity(
+    roomName,
+    userId,
+    identity
+) {
+    const roomUsers =
+        liveKitParticipants.get(
+            roomName
+        );
+
+    if (!roomUsers) {
+        return;
+    }
+
+    const identities =
+        roomUsers.get(
+            userId
+        );
+
+    if (!identities) {
+        return;
+    }
+
+    identities.delete(
+        identity
+    );
+
+    if (
+        identities.size === 0
+    ) {
+        roomUsers.delete(
+            userId
+        );
+    }
+
+    if (
+        roomUsers.size === 0
+    ) {
+        liveKitParticipants.delete(
+            roomName
+        );
+    }
+}
+
+async function kickUserFromRoom(
+    roomName,
+    userId
+) {
+    if (!liveKitRoomService) {
+        console.warn(
+            "LiveKit RoomService недоступен."
+        );
+
+        return;
+    }
+
+    const identities =
+        getLiveKitIdentities(
+            roomName,
+            userId
+        );
+
+    if (
+        identities.length === 0
+    ) {
+        return;
+    }
+
+    for (
+        const identity
+        of identities
+    ) {
+        try {
+            await liveKitRoomService
+                .removeParticipant(
+                    roomName,
+                    identity
+                );
+
+            console.log(
+                `LiveKit kick: ${identity} из ${roomName}`
+            );
+
+        } catch (error) {
+            console.warn(
+                `Не удалось исключить ${identity} из ${roomName}:`,
+                error.message
+            );
         }
 
-        /* =========================
-           REPORT STATE
-           ========================= */
+        removeTrackedIdentity(
+            roomName,
+            userId,
+            identity
+        );
+    }
+}
 
-        var selectedReportReason =
-            null;
+/* =========================
+   LIVEKIT TOKEN
+   ========================= */
 
-        var reportSentThisConnection =
-            false;
+app.get(
+    "/api/livekit-token",
+    async function (
+        req,
+        res
+    ) {
+        try {
+            const room =
+                req.query.room;
 
-        /* =========================
-           CHAT
-           ========================= */
-
-        var chatStatus =
-            document.getElementById(
-                "chatStatus"
-            );
-
-        var chatMessages =
-            document.getElementById(
-                "chatMessages"
-            );
-
-        var chatEmpty =
-            document.getElementById(
-                "chatEmpty"
-            );
-
-        var chatForm =
-            document.getElementById(
-                "chatForm"
-            );
-
-        var chatInput =
-            document.getElementById(
-                "chatInput"
-            );
-
-        var chatSend =
-            document.getElementById(
-                "chatSend"
-            );
-
-        var chatHistory = [];
-
-        /* =========================
-           STATE
-           ========================= */
-
-        var myGender = null;
-        var searchGender = "any";
-
-        var socketId = null;
-        var room = null;
-
-        var localVideoTrack = null;
-        var localAudioTrack = null;
-
-        var searching = false;
-        var connected = false;
-
-        var checkTimer = null;
-
-        var remoteAudio = null;
-
-        var timerInterval = null;
-        var connectionStartTime = null;
-
-        var cameraFacingMode = "user";
-
-        var microphoneMuted = false;
-        var cameraMuted = false;
-
-        var leavingLocally = false;
-
-        var currentBanExpiresAt = null;
-        var currentBanTimer = null;
-
-        /* =========================
-           UI
-           ========================= */
-
-        function setStatus(text) {
-
-            statusEl.textContent =
-                text;
-        }
-
-        function updateButtons() {
-
-            joinButton.disabled =
-                searching ||
-                connected ||
-                !!currentBanExpiresAt;
-
-            leaveButton.disabled =
-                !searching &&
-                !connected;
-
-            micButton.disabled =
-                !connected ||
-                !localAudioTrack;
-
-            cameraButton.disabled =
-                !localVideoTrack;
-
-            cameraSwitchButton.disabled =
-                !localVideoTrack;
-
-            reportButton.disabled =
-                !connected ||
-                reportSentThisConnection;
-
-            chatInput.disabled =
-                !connected;
-
-            chatSend.disabled =
-                !connected;
-        }
-
-        function updateChatStatus() {
-
-            if (currentBanExpiresAt) {
-
-                chatStatus.textContent =
-                    "Доступ заблокирован";
-
-            } else if (connected) {
-
-                chatStatus.textContent =
-                    "Собеседник подключён";
-
-            } else if (searching) {
-
-                chatStatus.textContent =
-                    "Ожидание собеседника...";
-
-            } else {
-
-                chatStatus.textContent =
-                    "Нет соединения";
-            }
-        }
-
-        /* =========================
-           BAN UI
-           ========================= */
-
-        function formatBanDate(
-            expiresAt
-        ) {
-
-            if (!expiresAt) {
-                return "Навсегда";
+            if (!room) {
+                return res.status(400).json({
+                    error:
+                        "Room is required"
+                });
             }
 
-            var date =
-                new Date(
-                    expiresAt
+            const userId =
+                ensureUserId(
+                    req,
+                    res
+                );
+
+            const ban =
+                getActiveBan(
+                    userId
+                );
+
+            if (ban) {
+                return res.status(403).json({
+                    error:
+                        "USER_BANNED",
+
+                    reason:
+                        ban.reason,
+
+                    expiresAt:
+                        ban.expiresAt
+                });
+            }
+
+            const identity =
+                "user-" +
+                crypto
+                    .randomBytes(8)
+                    .toString("hex");
+
+            const token =
+                new AccessToken(
+                    process.env.LIVEKIT_API_KEY,
+                    process.env.LIVEKIT_API_SECRET,
+                    {
+                        identity:
+                            identity
+                    }
+                );
+
+            token.addGrant({
+                roomJoin:
+                    true,
+
+                room:
+                    room
+            });
+
+            const jwt =
+                await token.toJwt();
+
+            registerLiveKitParticipant(
+                room,
+                userId,
+                identity
+            );
+
+            /*
+             * Если это реальный матч,
+             * считаем момент первого
+             * получения LiveKit token
+             * началом разговора.
+             */
+            const matchData =
+                matchRooms.get(
+                    room
                 );
 
             if (
-                Number.isNaN(
-                    date.getTime()
-                )
+                matchData &&
+                !matchData.startedAt
             ) {
-                return "Неизвестно";
+                matchData.startedAt =
+                    Date.now();
             }
 
-            return date.toLocaleString(
-                "ru-RU",
+            return res.json({
+                token:
+                    jwt,
+
+                url:
+                    process.env.LIVEKIT_URL,
+
+                identity:
+                    identity
+            });
+
+        } catch (error) {
+            console.error(
+                "LiveKit token error:",
+                error
+            );
+
+            return res.status(500).json({
+                error:
+                    "Failed to create LiveKit token"
+            });
+        }
+    }
+);
+
+function isSocketOwner(socketId, userId) {
+    return Boolean(
+        socketId &&
+        userId &&
+        socketOwners.get(socketId) === userId
+    );
+}
+
+/* =========================
+   START MATCH
+   ========================= */
+
+app.post(
+    "/api/match/start",
+    async function (
+        req,
+        res
+    ) {
+        try {
+            const userId =
+                ensureUserId(
+                    req,
+                    res
+                );
+
+            const ban =
+                getActiveBan(
+                    userId
+                );
+
+            if (ban) {
+                return res.status(403).json({
+                    error:
+                        "USER_BANNED",
+
+                    reason:
+                        ban.reason,
+
+                    expiresAt:
+                        ban.expiresAt
+                });
+            }
+
+            const {
+                socketId,
+                gender,
+                searchGender
+            } = req.body;
+
+            if (
+                !socketId ||
+                typeof socketId !==
+                    "string"
+            ) {
+                return res.status(400).json({
+                    error:
+                        "socketId is required"
+                });
+            }
+
+            if (
+                !gender ||
+                typeof gender !==
+                    "string"
+            ) {
+                return res.status(400).json({
+                    error:
+                        "gender is required"
+                });
+            }
+
+            const normalizedSearchGender =
+                searchGender === "male" ||
+                searchGender === "female"
+                    ? searchGender
+                    : "any";
+
+            const existingOwner =
+                socketOwners.get(socketId);
+
+            if (
+                existingOwner &&
+                existingOwner !== userId
+            ) {
+                return res.status(403).json({
+                    error:
+                        "socketId already belongs to another user"
+                });
+            }
+
+            socketOwners.set(
+                socketId,
+                userId
+            );
+
+            waitingUsers.delete(
+                socketId
+            );
+
+            matches.delete(
+                socketId
+            );
+
+            /*
+             * Статистика пользователя.
+             */
+            const country =
+                await getCountry(
+                    req
+                );
+
+            recordUser(
+                userId,
                 {
-                    dateStyle:
-                        "medium",
+                    gender:
+                        gender,
 
-                    timeStyle:
-                        "short"
+                    searchGender:
+                        normalizedSearchGender,
+
+                    countryCode:
+                        country.code,
+
+                    countryName:
+                        country.name
                 }
             );
-        }
 
-        function getBanRemaining(
-            expiresAt
-        ) {
+            incrementSearchStarted();
 
-            if (!expiresAt) {
-                return "Навсегда";
-            }
+            let matchedId = null;
+            let matchedUser = null;
 
-            var target =
-                new Date(
-                    expiresAt
-                ).getTime();
-
-            if (
-                !Number.isFinite(
-                    target
-                )
+            for (
+                const [
+                    id,
+                    user
+                ]
+                    of waitingUsers
             ) {
-                return "Неизвестно";
-            }
+                if (
+                    id === socketId
+                ) {
+                    continue;
+                }
 
-            var diff =
-                Math.max(
-                    0,
-                    target -
-                    Date.now()
-                );
+                const firstWants =
+                    normalizedSearchGender ===
+                        "any" ||
+                    normalizedSearchGender ===
+                        user.gender;
 
-            var totalSeconds =
-                Math.ceil(
-                    diff / 1000
-                );
-
-            if (
-                totalSeconds <= 0
-            ) {
-                return "Блокировка закончилась";
-            }
-
-            var days =
-                Math.floor(
-                    totalSeconds /
-                    86400
-                );
-
-            var hours =
-                Math.floor(
-                    (
-                        totalSeconds %
-                        86400
-                    ) / 3600
-                );
-
-            var minutes =
-                Math.floor(
-                    (
-                        totalSeconds %
-                        3600
-                    ) / 60
-                );
-
-            var seconds =
-                totalSeconds %
-                60;
-
-            if (days > 0) {
-
-                return (
-                    days +
-                    " д. " +
-                    hours +
-                    " ч."
-                );
-            }
-
-            if (hours > 0) {
-
-                return (
-                    hours +
-                    " ч. " +
-                    minutes +
-                    " мин."
-                );
-            }
-
-            if (minutes > 0) {
-
-                return (
-                    minutes +
-                    " мин. " +
-                    seconds +
-                    " сек."
-                );
-            }
-
-            return (
-                seconds +
-                " сек."
-            );
-        }
-
-        function clearBanState() {
-
-            currentBanExpiresAt =
-                null;
-
-            if (currentBanTimer) {
-
-                clearInterval(
-                    currentBanTimer
-                );
-
-                currentBanTimer =
-                    null;
-            }
-
-            banModal.classList.add(
-                "hidden"
-            );
-
-            banReason.textContent =
-                "—";
-
-            banDuration.textContent =
-                "—";
-
-            banUntil.textContent =
-                "—";
-
-            updateButtons();
-            updateChatStatus();
-        }
-
-        function startBanCountdown() {
-
-            if (currentBanTimer) {
-
-                clearInterval(
-                    currentBanTimer
-                );
-            }
-
-            if (!currentBanExpiresAt) {
-                return;
-            }
-
-            currentBanTimer =
-                setInterval(
-                    function () {
-
-                        if (
-                            !currentBanExpiresAt
-                        ) {
-                            return;
-                        }
-
-                        var target =
-                            new Date(
-                                currentBanExpiresAt
-                            ).getTime();
-
-                        if (
-                            !Number.isFinite(
-                                target
-                            ) ||
-                            Date.now() >=
-                                target
-                        ) {
-
-                            clearBanState();
-
-                            setStatus(
-                                "Блокировка закончилась"
-                            );
-
-                            return;
-                        }
-
-                        banDuration.textContent =
-                            getBanRemaining(
-                                currentBanExpiresAt
-                            );
-
-                    },
-                    1000
-                );
-        }
-
-        function showBanModal(
-            reason,
-            expiresAt
-        ) {
-
-            currentBanExpiresAt =
-                expiresAt ||
-                null;
-
-            banReason.textContent =
-                reason ||
-                "Нарушение правил";
-
-            if (expiresAt) {
-
-                banDuration.textContent =
-                    getBanRemaining(
-                        expiresAt
-                    );
-
-                banUntil.textContent =
-                    formatBanDate(
-                        expiresAt
-                    );
-
-            } else {
-
-                banDuration.textContent =
-                    "Навсегда";
-
-                banUntil.textContent =
-                    "Навсегда";
-            }
-
-            banUntilRow.classList.remove(
-                "hidden"
-            );
-
-            banModal.classList.remove(
-                "hidden"
-            );
-
-            setStatus(
-                "Доступ заблокирован"
-            );
-
-            updateButtons();
-            updateChatStatus();
-
-            startBanCountdown();
-        }
-
-        banClose.addEventListener(
-            "click",
-            function () {
-
-                banModal.classList.add(
-                    "hidden"
-                );
-            }
-        );
-
-        banModal.addEventListener(
-            "click",
-            function (event) {
+                const secondWants =
+                    user.searchGender ===
+                        "any" ||
+                    user.searchGender ===
+                        gender;
 
                 if (
-                    event.target ===
-                    banModal
+                    !firstWants ||
+                    !secondWants
                 ) {
-
-                    banModal.classList.add(
-                        "hidden"
-                    );
+                    continue;
                 }
+
+                const otherBan =
+                    getActiveBan(
+                        user.userId
+                    );
+
+                if (otherBan) {
+                    continue;
+                }
+
+                matchedId =
+                    id;
+
+                matchedUser =
+                    user;
+
+                break;
             }
-        );
 
-        /* =========================
-           CHAT HISTORY
-           ========================= */
+            if (
+                matchedId &&
+                matchedUser
+            ) {
+                waitingUsers.delete(
+                    matchedId
+                );
 
-        function resetChatHistory() {
+                const roomName =
+                    "icechat-" +
+                    Date.now() +
+                    "-" +
+                    crypto
+                        .randomBytes(4)
+                        .toString("hex");
 
-            chatHistory = [];
+                const matchRoom = {
+                    users: [
+                        matchedId,
+                        socketId
+                    ],
+
+                    userIds: [
+                        matchedUser.userId,
+                        userId
+                    ],
+
+                    sessionIds: [
+                        matchedId,
+                        socketId
+                    ],
+
+                    endedFor:
+                        new Set(),
+
+                    createdAt:
+                        Date.now(),
+
+                    startedAt:
+                        null,
+
+                    analyticsRecorded:
+                        false
+                };
+
+                matchRooms.set(
+                    roomName,
+                    matchRoom
+                );
+
+                matches.set(
+                    matchedId,
+                    {
+                        roomName:
+                            roomName,
+
+                        peer: {
+                            gender:
+                                gender,
+
+                            country:
+                                country
+                        }
+                    }
+                );
+
+                incrementSearchMatched();
+                incrementSearchMatched();
+
+                return res.json({
+                    status:
+                        "matched",
+
+                    roomName:
+                        roomName,
+
+                    peer: {
+                        gender:
+                            matchedUser.gender,
+
+                        country:
+                            matchedUser.country
+                    }
+                });
+            }
+
+            waitingUsers.set(
+                socketId,
+                {
+                    userId:
+                        userId,
+
+                    socketId:
+                        socketId,
+
+                    gender:
+                        gender,
+
+                    searchGender:
+                        normalizedSearchGender,
+
+                    country:
+                        country,
+
+                    createdAt:
+                        Date.now()
+                }
+            );
+
+            return res.json({
+                status:
+                    "waiting"
+            });
+
+        } catch (error) {
+            console.error(
+                "Match start error:",
+                error
+            );
+
+            return res.status(500).json({
+                error:
+                    "Match failed"
+            });
         }
+    }
+);
 
-        function addHistoryMessage(
-            text,
-            mine
-        ) {
+/* =========================
+   CHECK MATCH
+   ========================= */
 
-            if (!text) {
-                return;
-            }
+app.get(
+    "/api/match/check",
+    function (
+        req,
+        res
+    ) {
+        const socketId =
+            req.query.socketId;
 
-            chatHistory.push({
+        const userId =
+            getUserId(req);
 
-                side:
-                    mine
-                        ? "Вы"
-                        : "Собеседник",
-
-                text:
-                    text,
-
-                timestamp:
-                    new Date()
-                        .toISOString()
+        if (!socketId) {
+            return res.status(400).json({
+                error:
+                    "socketId is required"
             });
         }
 
-        /* =========================
-           REPORT
-           ========================= */
-
-        function resetReportUI() {
-
-            selectedReportReason =
-                null;
-
-            reportSentThisConnection =
-                false;
-
-            reportDetails.value =
-                "";
-
-            document
-                .querySelectorAll(
-                    ".report-reason"
-                )
-                .forEach(
-                    function (button) {
-
-                        button.classList.remove(
-                            "selected"
-                        );
-                    }
-                );
-
-            reportSubmit.disabled =
-                true;
-
-            reportSubmit.textContent =
-                "Отправить жалобу";
-
-            reportButton.textContent =
-                "🚩 Пожаловаться";
+        if (!isSocketOwner(socketId, userId)) {
+            return res.status(403).json({
+                error:
+                    "Socket authorization failed"
+            });
         }
 
-        function openReportModal() {
-
+        for (
+            const [
+                roomName,
+                matchData
+            ]
+                of matchRooms
+        ) {
             if (
-                !connected ||
-                reportSentThisConnection
+                !matchData.users.includes(
+                    socketId
+                )
             ) {
-                return;
+                continue;
             }
 
-            selectedReportReason =
-                null;
-
-            reportDetails.value =
-                "";
-
-            document
-                .querySelectorAll(
-                    ".report-reason"
-                )
-                .forEach(
-                    function (button) {
-
-                        button.classList.remove(
-                            "selected"
+            const otherUser =
+                matchData.users.find(
+                    function (id) {
+                        return (
+                            id !==
+                            socketId
                         );
                     }
                 );
 
-            reportSubmit.disabled =
-                true;
+            if (
+                matchData.endedFor.has(
+                    socketId
+                )
+            ) {
+                return res.json({
+                    status:
+                        "ended"
+                });
+            }
 
-            reportSubmit.textContent =
-                "Отправить жалобу";
+            if (
+                otherUser &&
+                matchData.endedFor.has(
+                    otherUser
+                )
+            ) {
+                matchData.endedFor.add(
+                    socketId
+                );
 
-            reportModal.classList.remove(
-                "hidden"
-            );
+                return res.json({
+                    status:
+                        "peerLeft"
+                });
+            }
         }
 
-        function closeReportModal() {
-
-            reportModal.classList.add(
-                "hidden"
+        const match =
+            matches.get(
+                socketId
             );
+
+        if (!match) {
+            return res.json({
+                status:
+                    "waiting"
+            });
         }
 
-        function captureRemoteEvidence() {
+        matches.delete(
+            socketId
+        );
 
-            try {
+        return res.json({
+            status:
+                "matched",
 
-                if (
-                    !remoteVideo ||
-                    !remoteVideo.videoWidth ||
-                    !remoteVideo.videoHeight
-                ) {
+            roomName:
+                match.roomName,
 
-                    return null;
-                }
+            peer:
+                match.peer
+        });
+    }
+);
 
-                var canvas =
-                    document.createElement(
-                        "canvas"
+/* =========================
+   STOP MATCH
+   ========================= */
+
+app.post(
+    "/api/match/stop",
+    function (
+        req,
+        res
+    ) {
+        const {
+            socketId
+        } = req.body;
+
+        const userId =
+            getUserId(req);
+
+        if (!socketId) {
+            return res.json({
+                status:
+                    "stopped"
+            });
+        }
+
+        if (!isSocketOwner(socketId, userId)) {
+            return res.status(403).json({
+                error:
+                    "Socket authorization failed"
+            });
+        }
+
+        /*
+         * Если пользователь был именно
+         * в очереди ожидания — считаем
+         * отменённым поиском.
+         */
+        const waitingUser =
+            waitingUsers.get(
+                socketId
+            );
+
+        if (waitingUser) {
+            waitingUsers.delete(
+                socketId
+            );
+
+            matches.delete(
+                socketId
+            );
+
+            socketOwners.delete(
+                socketId
+            );
+
+            incrementSearchCancelled();
+
+            return res.json({
+                status:
+                    "stopped"
+            });
+        }
+
+        matches.delete(
+            socketId
+        );
+
+        socketOwners.delete(
+            socketId
+        );
+
+        for (
+            const [
+                roomName,
+                matchData
+            ]
+                of matchRooms
+        ) {
+            if (
+                !matchData.users.includes(
+                    socketId
+                )
+            ) {
+                continue;
+            }
+
+            matchData.endedFor.add(
+                socketId
+            );
+
+            if (
+                matchData.endedFor.size >=
+                2
+            ) {
+                recordSession(
+                    roomName,
+                    matchData
+                );
+
+                matchRooms.delete(
+                    roomName
+                );
+
+                liveKitParticipants.delete(
+                    roomName
+                );
+            }
+
+            break;
+        }
+
+        return res.json({
+            status:
+                "stopped"
+        });
+    }
+);
+
+/* =========================
+   REPORT
+   ========================= */
+
+app.post(
+    "/api/report",
+    function (
+        req,
+        res
+    ) {
+        try {
+            const reporterId =
+                getUserId(
+                    req
+                );
+
+            if (!reporterId) {
+                return res.status(400).json({
+                    error:
+                        "User identity missing"
+                });
+            }
+
+            const {
+                reason,
+                details,
+                roomName,
+                chatHistory,
+                evidenceImage,
+                evidenceCapturedAt
+            } = req.body;
+
+            if (
+                !reason ||
+                typeof reason !==
+                    "string"
+            ) {
+                return res.status(400).json({
+                    error:
+                        "Reason is required"
+                });
+            }
+
+            if (
+                !roomName ||
+                typeof roomName !==
+                    "string"
+            ) {
+                return res.status(400).json({
+                    error:
+                        "Room is required"
+                });
+            }
+
+            const matchData =
+                matchRooms.get(
+                    roomName
+                );
+
+            if (!matchData) {
+                return res.status(400).json({
+                    error:
+                        "Match no longer exists"
+                });
+            }
+
+            const reporterIndex =
+                matchData.userIds.indexOf(
+                    reporterId
+                );
+
+            if (
+                reporterIndex ===
+                -1
+            ) {
+                return res.status(403).json({
+                    error:
+                        "You are not a member of this room"
+                });
+            }
+
+            const targetIndex =
+                reporterIndex === 0
+                    ? 1
+                    : 0;
+
+            const targetUserId =
+                matchData.userIds[
+                    targetIndex
+                ];
+
+            const targetSessionId =
+                matchData.sessionIds
+                    ? matchData.sessionIds[
+                        targetIndex
+                    ]
+                    : null;
+
+            const cleanReason =
+                reason
+                    .trim()
+                    .substring(
+                        0,
+                        200
                     );
 
-                var maxWidth =
-                    960;
-
-                var width =
-                    Math.min(
-                        remoteVideo.videoWidth,
-                        maxWidth
-                    );
-
-                var height =
-                    Math.round(
-                        remoteVideo.videoHeight *
-                        (
-                            width /
-                            remoteVideo.videoWidth
+            const cleanDetails =
+                typeof details ===
+                    "string"
+                    ? details
+                        .trim()
+                        .substring(
+                            0,
+                            1000
                         )
-                    );
+                    : "";
 
-                canvas.width =
-                    width;
-
-                canvas.height =
-                    height;
-
-                var context =
-                    canvas.getContext(
-                        "2d"
-                    );
-
-                if (!context) {
-                    return null;
-                }
-
-                context.drawImage(
-                    remoteVideo,
-                    0,
-                    0,
-                    width,
-                    height
-                );
-
-                return canvas.toDataURL(
-                    "image/jpeg",
-                    0.72
-                );
-
-            } catch (error) {
-
-                console.error(
-                    "CAPTURE EVIDENCE ERROR:",
-                    error
-                );
-
-                return null;
-            }
-        }
-
-        async function submitReport() {
+            let safeChatHistory =
+                [];
 
             if (
-                !connected ||
-                !selectedReportReason ||
-                reportSentThisConnection
+                Array.isArray(
+                    chatHistory
+                )
             ) {
-                return;
-            }
+                safeChatHistory =
+                    chatHistory
+                        .slice(
+                            0,
+                            1000
+                        )
+                        .map(
+                            function (
+                                item
+                            ) {
+                                return {
+                                    side:
+                                        item &&
+                                        (
+                                            item.side ===
+                                                "Вы" ||
+                                            item.side ===
+                                                "Собеседник"
+                                        )
+                                            ? item.side
+                                            : "Неизвестно",
 
-            reportSubmit.disabled =
-                true;
+                                    text:
+                                        item &&
+                                        typeof item.text ===
+                                            "string"
+                                            ? item.text.substring(
+                                                0,
+                                                1000
+                                            )
+                                            : "",
 
-            reportSubmit.textContent =
-                "Сохраняем доказательства...";
-
-            try {
-
-                var evidenceImage =
-                    captureRemoteEvidence();
-
-                var response =
-                    await fetch(
-                        "/api/report",
-                        {
-                            method:
-                                "POST",
-
-                            headers: {
-                                "Content-Type":
-                                    "application/json"
-                            },
-
-                            body:
-                                JSON.stringify({
-
-                                    reason:
-                                        selectedReportReason,
-
-                                    details:
-                                        reportDetails
-                                            .value
-                                            .trim(),
-
-                                    roomName:
-                                        room
-                                            ? room.name
-                                            : "unknown",
-
-                                    chatHistory:
-                                        chatHistory,
-
-                                    evidenceImage:
-                                        evidenceImage,
-
-                                    evidenceCapturedAt:
-                                        new Date()
-                                            .toISOString()
-                                })
-                        }
-                    );
-
-                var result =
-                    await response
-                        .json()
-                        .catch(
-                            function () {
-                                return {};
+                                    timestamp:
+                                        item &&
+                                        item.timestamp
+                                            ? String(
+                                                item.timestamp
+                                            )
+                                            : null
+                                };
                             }
                         );
-
-                if (!response.ok) {
-
-                    throw new Error(
-                        result.error ||
-                        "Report request failed"
-                    );
-                }
-
-                reportSentThisConnection =
-                    true;
-
-                closeReportModal();
-
-                reportButton.textContent =
-                    "✅ Жалоба отправлена";
-
-                updateButtons();
-
-                setStatus(
-                    evidenceImage
-                        ? "Жалоба отправлена"
-                        : "Жалоба отправлена, но кадр видео недоступен"
-                );
-
-            } catch (error) {
-
-                console.error(
-                    "REPORT ERROR:",
-                    error
-                );
-
-                reportSubmit.disabled =
-                    false;
-
-                reportSubmit.textContent =
-                    "Отправить жалобу";
-
-                setStatus(
-                    "Не удалось отправить жалобу"
-                );
-            }
-        }
-
-        reportButton.addEventListener(
-            "click",
-            function () {
-
-                openReportModal();
-            }
-        );
-
-        reportCancel.addEventListener(
-            "click",
-            function () {
-
-                closeReportModal();
-            }
-        );
-
-        document
-            .querySelectorAll(
-                ".report-reason"
-            )
-            .forEach(
-                function (button) {
-
-                    button.addEventListener(
-                        "click",
-                        function () {
-
-                            selectedReportReason =
-                                button.getAttribute(
-                                    "data-reason"
-                                );
-
-                            document
-                                .querySelectorAll(
-                                    ".report-reason"
-                                )
-                                .forEach(
-                                    function (
-                                        item
-                                    ) {
-
-                                        item.classList.remove(
-                                            "selected"
-                                        );
-                                    }
-                                );
-
-                            button.classList.add(
-                                "selected"
-                            );
-
-                            reportSubmit.disabled =
-                                false;
-                        }
-                    );
-                }
-            );
-
-        reportSubmit.addEventListener(
-            "click",
-            function () {
-
-                submitReport();
-            }
-        );
-
-        reportModal.addEventListener(
-            "click",
-            function (event) {
-
-                if (
-                    event.target ===
-                    reportModal
-                ) {
-
-                    closeReportModal();
-                }
-            }
-        );
-
-        /* =========================
-           CHAT
-           ========================= */
-
-        function clearChat() {
-
-            while (
-                chatMessages.firstChild
-            ) {
-
-                chatMessages.removeChild(
-                    chatMessages.firstChild
-                );
             }
 
-            chatMessages.appendChild(
-                chatEmpty
-            );
-
-            chatEmpty.style.display =
-                "block";
-        }
-
-        function addChatMessage(
-            text,
-            mine
-        ) {
-
-            if (!text) {
-                return;
-            }
-
-            addHistoryMessage(
-                text,
-                mine
-            );
-
-            if (chatEmpty) {
-
-                chatEmpty.style.display =
-                    "none";
-            }
-
-            var message =
-                document.createElement(
-                    "div"
-                );
-
-            message.className =
-                "chat-message " +
-                (
-                    mine
-                        ? "mine"
-                        : "theirs"
-                );
-
-            message.textContent =
-                text;
-
-            chatMessages.appendChild(
-                message
-            );
-
-            chatMessages.scrollTop =
-                chatMessages.scrollHeight;
-        }
-
-        async function sendChatMessage(
-            text
-        ) {
-
-            if (
-                !connected ||
-                !room ||
-                !text
-            ) {
-                return;
-            }
-
-            var cleanText =
-                text.trim();
-
-            if (!cleanText) {
-                return;
-            }
-
-            try {
-
-                var payload =
-                    JSON.stringify({
-                        type:
-                            "chat",
-
-                        text:
-                            cleanText
-                    });
-
-                var data =
-                    new TextEncoder()
-                        .encode(
-                            payload
-                        );
-
-                await room
-                    .localParticipant
-                    .publishData(
-                        data,
-                        {
-                            reliable:
-                                true,
-
-                            topic:
-                                "icechat-chat"
-                        }
-                    );
-
-                addChatMessage(
-                    cleanText,
-                    true
-                );
-
-            } catch (error) {
-
-                console.error(
-                    "CHAT SEND ERROR:",
-                    error
-                );
-
-                setStatus(
-                    "Не удалось отправить сообщение"
-                );
-            }
-        }
-
-        function handleChatData(
-            payload,
-            participant,
-            kind,
-            topic
-        ) {
-
-            try {
-
-                if (
-                    topic &&
-                    topic !==
-                        "icechat-chat"
-                ) {
-                    return;
-                }
-
-                var text =
-                    new TextDecoder()
-                        .decode(
-                            payload
-                        );
-
-                var message =
-                    JSON.parse(
-                        text
-                    );
-
-                if (
-                    !message ||
-                    message.type !==
-                        "chat"
-                ) {
-                    return;
-                }
-
-                if (
-                    typeof message.text !==
-                    "string"
-                ) {
-                    return;
-                }
-
-                var cleanText =
-                    message.text.trim();
-
-                if (!cleanText) {
-                    return;
-                }
-
-                addChatMessage(
-                    cleanText,
-                    false
-                );
-
-            } catch (error) {
-
-                console.error(
-                    "CHAT RECEIVE ERROR:",
-                    error
-                );
-            }
-        }
-
-        /* =========================
-           TIMER
-           ========================= */
-
-        function formatTime(
-            totalSeconds
-        ) {
-
-            var minutes =
-                Math.floor(
-                    totalSeconds /
-                    60
-                );
-
-            var seconds =
-                totalSeconds %
-                60;
-
-            return (
-                String(minutes)
-                    .padStart(
-                        2,
-                        "0"
-                    ) +
-                ":" +
-                String(seconds)
-                    .padStart(
-                        2,
-                        "0"
-                    )
-            );
-        }
-
-        function resetTimer() {
-
-            if (timerInterval) {
-
-                clearInterval(
-                    timerInterval
-                );
-
-                timerInterval =
-                    null;
-            }
-
-            connectionStartTime =
+            let safeEvidenceImage =
                 null;
 
-            callTimer.textContent =
-                "00:00";
-        }
+            if (
+                typeof evidenceImage ===
+                    "string" &&
+                evidenceImage.startsWith(
+                    "data:image/"
+                ) &&
+                evidenceImage.length <=
+                    3000000
+            ) {
+                safeEvidenceImage =
+                    evidenceImage;
+            }
 
-        function startTimer() {
+            const reports =
+                readReports();
 
-            resetTimer();
-
-            connectionStartTime =
-                Date.now();
-
-            timerInterval =
-                setInterval(
-                    function () {
-
-                        if (
-                            !connectionStartTime
-                        ) {
-                            return;
-                        }
-
-                        var elapsed =
-                            Math.floor(
-                                (
-                                    Date.now() -
-                                    connectionStartTime
-                                ) / 1000
-                            );
-
-                        callTimer.textContent =
-                            formatTime(
-                                elapsed
-                            );
-
-                    },
-                    1000
+            const duplicate =
+                reports.find(
+                    function (
+                        report
+                    ) {
+                        return (
+                            report.reporterId ===
+                                reporterId &&
+                            report.targetUserId ===
+                                targetUserId &&
+                            report.roomName ===
+                                roomName &&
+                            report.status ===
+                                "new"
+                        );
+                    }
                 );
+
+            if (duplicate) {
+                return res.json({
+                    status:
+                        "ok",
+
+                    reportId:
+                        duplicate.id
+                });
+            }
+
+            const report = {
+                id:
+                    randomId(
+                        "report_"
+                    ),
+
+                reason:
+                    cleanReason,
+
+                details:
+                    cleanDetails,
+
+                reporterId:
+                    reporterId,
+
+                targetUserId:
+                    targetUserId,
+
+                targetSessionId:
+                    targetSessionId,
+
+                roomName:
+                    roomName,
+
+                status:
+                    "new",
+
+                adminNote:
+                    "",
+
+                createdAt:
+                    new Date().toISOString(),
+
+                reviewedAt:
+                    null,
+
+                evidenceCapturedAt:
+                    evidenceCapturedAt
+                        ? String(
+                            evidenceCapturedAt
+                        )
+                        : null,
+
+                evidenceImage:
+                    safeEvidenceImage,
+
+                chatHistory:
+                    safeChatHistory
+            };
+
+            reports.push(
+                report
+            );
+
+            writeReports(
+                reports
+            );
+
+            console.log(
+                "Новая жалоба:",
+                report.id
+            );
+
+            return res.json({
+                status:
+                    "ok",
+
+                reportId:
+                    report.id
+            });
+
+        } catch (error) {
+            console.error(
+                "Report error:",
+                error
+            );
+
+            return res.status(500).json({
+                error:
+                    "Failed to save report"
+            });
+        }
+    }
+);
+
+/* =========================
+   ADMIN LOGIN
+   ========================= */
+
+app.post(
+    "/api/admin/login",
+    function (
+        req,
+        res
+    ) {
+        if (!ADMIN_PASSWORD) {
+            return res.status(500).json({
+                error:
+                    "ADMIN_PASSWORD is not configured"
+            });
         }
 
-        /* =========================
-           COUNTRY
-           ========================= */
+        const password =
+            typeof req.body.password ===
+                "string"
+                ? req.body.password
+                : "";
 
-        function getFlag(
-            code
+        if (
+            password !==
+            ADMIN_PASSWORD
         ) {
-
-            if (!code) {
-                return "🌐";
-            }
-
-            code =
-                String(code)
-                    .toUpperCase();
-
-            if (
-                code.length !== 2
-            ) {
-                return "🌐";
-            }
-
-            return (
-                String.fromCodePoint(
-                    127397 +
-                    code.charCodeAt(0)
-                ) +
-                String.fromCodePoint(
-                    127397 +
-                    code.charCodeAt(1)
-                )
-            );
+            return res.status(401).json({
+                error:
+                    "Неверный пароль"
+            });
         }
 
-        function showPeerInfo(
-            peer
-        ) {
-
-            if (!peer) {
-                return;
-            }
-
-            remoteInfo.classList.remove(
-                "hidden"
+        const sessionId =
+            randomId(
+                "adm_"
             );
 
-            if (
-                peer.gender ===
-                "male"
+        adminSessions.set(
+            sessionId,
+            {
+                createdAt:
+                    Date.now()
+            }
+        );
+
+        setCookie(
+            res,
+            "icechat_admin",
+            sessionId,
+            {
+                httpOnly:
+                    true,
+
+                sameSite:
+                    "Strict",
+
+                maxAge:
+                    60 *
+                    60 *
+                    12
+            }
+        );
+
+        return res.json({
+            status:
+                "ok"
+        });
+    }
+);
+
+/* =========================
+   ADMIN LOGOUT
+   ========================= */
+
+app.post(
+    "/api/admin/logout",
+    requireAdmin,
+    function (
+        req,
+        res
+    ) {
+        const cookies =
+            parseCookies(
+                req
+            );
+
+        adminSessions.delete(
+            cookies.icechat_admin
+        );
+
+        clearCookie(
+            res,
+            "icechat_admin"
+        );
+
+        return res.json({
+            status:
+                "ok"
+        });
+    }
+);
+
+/* =========================
+   ADMIN ME
+   ========================= */
+
+app.get(
+    "/api/admin/me",
+    requireAdmin,
+    function (
+        req,
+        res
+    ) {
+        return res.json({
+            status:
+                "ok"
+        });
+    }
+);
+
+/* =========================
+   ADMIN REPORTS
+   ========================= */
+
+app.get(
+    "/api/admin/reports",
+    requireAdmin,
+    function (
+        req,
+        res
+    ) {
+        const reports =
+            readReports();
+
+        reports.sort(
+            function (
+                a,
+                b
             ) {
+                return (
+                    new Date(
+                        b.createdAt ||
+                            0
+                    ).getTime() -
+                    new Date(
+                        a.createdAt ||
+                            0
+                    ).getTime()
+                );
+            }
+        );
 
-                remoteGender.innerHTML =
-                    '<span class="gender-symbol male">♂</span> ' +
-                    (currentLanguage === "en" ? "Male" : "Мужчина");
+        return res.json({
+            reports:
+                reports
+        });
+    }
+);
 
-            } else if (
-                peer.gender ===
-                "female"
-            ) {
+/* =========================
+   ADMIN REPORT ACTION
+   ========================= */
 
-                remoteGender.innerHTML =
-                    '<span class="gender-symbol female">♀</span> ' +
-                    (currentLanguage === "en" ? "Female" : "Женщина");
+app.post(
+    "/api/admin/reports/:reportId/action",
+    requireAdmin,
+    async function (
+        req,
+        res
+    ) {
+        try {
+            const reportId =
+                req.params.reportId;
 
-            } else {
+            const {
+                action,
+                note,
+                duration
+            } = req.body;
 
-                remoteGender.textContent =
-                    "👤 Собеседник";
+            const reports =
+                readReports();
+
+            const report =
+                reports.find(
+                    function (
+                        item
+                    ) {
+                        return (
+                            item.id ===
+                            reportId
+                        );
+                    }
+                );
+
+            if (!report) {
+                return res.status(404).json({
+                    error:
+                        "Report not found"
+                });
             }
 
-            var code =
-                "UN";
+            const cleanNote =
+                typeof note ===
+                    "string"
+                    ? note
+                        .trim()
+                        .substring(
+                            0,
+                            1000
+                        )
+                    : "";
 
-            if (peer.country) {
+            if (
+                action ===
+                "reject"
+            ) {
+                report.status =
+                    "rejected";
+
+                report.adminNote =
+                    cleanNote;
+
+                report.reviewedAt =
+                    new Date().toISOString();
+
+                writeReports(
+                    reports
+                );
+
+                return res.json({
+                    status:
+                        "ok"
+                });
+            }
+
+            if (
+                action ===
+                "warn"
+            ) {
+                report.status =
+                    "warning";
+
+                report.adminNote =
+                    cleanNote;
+
+                report.reviewedAt =
+                    new Date().toISOString();
+
+                writeReports(
+                    reports
+                );
+
+                return res.json({
+                    status:
+                        "ok"
+                });
+            }
+
+            if (
+                action ===
+                "ban"
+            ) {
+                if (
+                    !report.targetUserId
+                ) {
+                    return res.status(400).json({
+                        error:
+                            "В этой старой жалобе нет ID нарушителя. Новые жалобы будут содержать его автоматически."
+                    });
+                }
+
+                const bans =
+                    readBans();
+
+                const existingIndex =
+                    bans.findIndex(
+                        function (
+                            ban
+                        ) {
+                            return (
+                                ban.userId ===
+                                report.targetUserId
+                            );
+                        }
+                    );
+
+                let expiresAt =
+                    null;
 
                 if (
-                    typeof peer.country ===
-                    "object"
+                    duration ===
+                    "minute"
                 ) {
+                    expiresAt =
+                        new Date(
+                            Date.now() +
+                            60 *
+                            1000
+                        ).toISOString();
 
-                    code =
-                        peer.country.code ||
-                        peer.country.countryCode ||
-                        "UN";
+                } else if (
+                    duration ===
+                        "1day" ||
+                    duration ===
+                        "24"
+                ) {
+                    expiresAt =
+                        new Date(
+                            Date.now() +
+                            1 *
+                            24 *
+                            60 *
+                            60 *
+                            1000
+                        ).toISOString();
+
+                } else if (
+                    duration ===
+                    "3days"
+                ) {
+                    expiresAt =
+                        new Date(
+                            Date.now() +
+                            3 *
+                            24 *
+                            60 *
+                            60 *
+                            1000
+                        ).toISOString();
+
+                } else if (
+                    duration ===
+                    "7days"
+                ) {
+                    expiresAt =
+                        new Date(
+                            Date.now() +
+                            7 *
+                            24 *
+                            60 *
+                            60 *
+                            1000
+                        ).toISOString();
+
+                } else if (
+                    duration ===
+                    "30days"
+                ) {
+                    expiresAt =
+                        new Date(
+                            Date.now() +
+                            30 *
+                            24 *
+                            60 *
+                            60 *
+                            1000
+                        ).toISOString();
+
+                } else if (
+                    duration ===
+                    "permanent"
+                ) {
+                    expiresAt =
+                        null;
+
+                } else if (
+                    typeof duration ===
+                    "number"
+                ) {
+                    if (
+                        !Number.isFinite(
+                            duration
+                        ) ||
+                        duration <= 0
+                    ) {
+                        return res.status(400).json({
+                            error:
+                                "Invalid ban duration"
+                        });
+                    }
+
+                    expiresAt =
+                        new Date(
+                            Date.now() +
+                            duration *
+                            60 *
+                            60 *
+                            1000
+                        ).toISOString();
 
                 } else {
-
-                    code =
-                        peer.country;
-                }
-            }
-
-            code =
-                String(code)
-                    .toUpperCase();
-
-            remoteCountry.textContent =
-                getFlag(code) +
-                " " +
-                code;
-        }
-
-        /* =========================
-           VIDEO / AUDIO
-           ========================= */
-
-        function attachLocal(
-            track
-        ) {
-
-            if (!track) {
-                return;
-            }
-
-            try {
-
-                track.attach(
-                    localVideo
-                );
-
-                localVideo.autoplay =
-                    true;
-
-                localVideo.muted =
-                    true;
-
-                localVideo.playsInline =
-                    true;
-
-                localVideo.play()
-                    .catch(
-                        function () {}
-                    );
-
-            } catch (error) {
-
-                console.error(
-                    "Ошибка своей камеры:",
-                    error
-                );
-            }
-        }
-
-        function attachRemote(
-            track
-        ) {
-
-            if (!track) {
-                return;
-            }
-
-            try {
-
-                track.attach(
-                    remoteVideo
-                );
-
-                remoteVideo.autoplay =
-                    true;
-
-                remoteVideo.playsInline =
-                    true;
-
-                remotePlaceholder
-                    .style
-                    .display =
-                    "none";
-
-                remoteVideo.play()
-                    .catch(
-                        function () {}
-                    );
-
-            } catch (error) {
-
-                console.error(
-                    "Ошибка камеры собеседника:",
-                    error
-                );
-            }
-        }
-
-        function attachAudio(
-            track
-        ) {
-
-            if (!track) {
-                return;
-            }
-
-            try {
-
-                if (remoteAudio) {
-
-                    try {
-                        remoteAudio.remove();
-                    } catch (error) {}
+                    expiresAt =
+                        new Date(
+                            Date.now() +
+                            1 *
+                            24 *
+                            60 *
+                            60 *
+                            1000
+                        ).toISOString();
                 }
 
-                remoteAudio =
-                    document.createElement(
-                        "audio"
-                    );
+                const ban = {
+                    userId:
+                        report.targetUserId,
 
-                remoteAudio.autoplay =
-                    true;
+                    reason:
+                        report.reason,
 
-                document.body.appendChild(
-                    remoteAudio
-                );
+                    adminNote:
+                        cleanNote,
 
-                track.attach(
-                    remoteAudio
-                );
+                    createdAt:
+                        new Date().toISOString(),
 
-                remoteAudio
-                    .play()
-                    .catch(
-                        function () {}
-                    );
+                    expiresAt:
+                        expiresAt
+                };
 
-            } catch (error) {
-
-                console.error(
-                    "Ошибка звука:",
-                    error
-                );
-            }
-        }
-
-        /* =========================
-           LOCAL MEDIA
-           ========================= */
-
-        async function startLocalMedia() {
-
-            try {
-
-                if (!localVideoTrack) {
-
-                    setStatus(
-                        "Запуск камеры..."
-                    );
-
-                    localVideoTrack =
-                        await
-                        createLocalVideoTrack();
-
-                    attachLocal(
-                        localVideoTrack
-                    );
-                }
-
-                if (!localAudioTrack) {
-
-                    localAudioTrack =
-                        await
-                        createLocalAudioTrack();
-                }
-
-                updateButtons();
-                updateChatStatus();
-
-                return true;
-
-            } catch (error) {
-
-                console.error(
-                    "Ошибка камеры/микрофона:",
-                    error
-                );
-
-                localVideoTrack =
-                    null;
-
-                localAudioTrack =
-                    null;
-
-                setStatus(
-                    "Не удалось получить камеру или микрофон"
-                );
-
-                updateButtons();
-                updateChatStatus();
-
-                return false;
-            }
-        }
-
-        /* =========================
-           CAMERA SWITCH
-           ========================= */
-
-        async function switchCamera() {
-
-            if (!localVideoTrack) {
-                return;
-            }
-
-            try {
-
-                cameraSwitchButton.disabled =
-                    true;
-
-                var newFacingMode =
-                    cameraFacingMode ===
-                        "user"
-                        ? "environment"
-                        : "user";
-
-                setStatus(
-                    "Переключение камеры..."
-                );
-
-                await localVideoTrack
-                    .restartTrack({
-                        facingMode:
-                            newFacingMode
-                    });
-
-                cameraFacingMode =
-                    newFacingMode;
-
-                attachLocal(
-                    localVideoTrack
-                );
-
-                if (connected) {
-
-                    setStatus(
-                        "Собеседник подключён"
-                    );
-
-                } else if (searching) {
-
-                    setStatus(
-                        "Поиск собеседника..."
-                    );
-
+                if (
+                    existingIndex !==
+                    -1
+                ) {
+                    bans[
+                        existingIndex
+                    ] = ban;
                 } else {
-
-                    setStatus(
-                        "Готов к поиску"
+                    bans.push(
+                        ban
                     );
                 }
 
-            } catch (error) {
-
-                console.error(
-                    "CAMERA SWITCH ERROR:",
-                    error
+                writeBans(
+                    bans
                 );
 
-                setStatus(
-                    "Вторая камера недоступна"
+                report.status =
+                    "banned";
+
+                report.adminNote =
+                    cleanNote;
+
+                report.reviewedAt =
+                    new Date().toISOString();
+
+                writeReports(
+                    reports
                 );
 
-            } finally {
+                for (
+                    const [
+                        socketId,
+                        user
+                    ]
+                        of waitingUsers
+                ) {
+                    if (
+                        user.userId ===
+                        report.targetUserId
+                    ) {
+                        waitingUsers.delete(
+                            socketId
+                        );
 
-                updateButtons();
-            }
-        }
+                        matches.delete(
+                            socketId
+                        );
 
-        /* =========================
-           LIVEKIT
-           ========================= */
-
-        async function connectToRoom(
-            roomName,
-            peer
-        ) {
-
-            try {
-
-                setStatus(
-                    "Подключение..."
-                );
-
-                var mediaReady =
-                    await startLocalMedia();
-
-                if (!mediaReady) {
-
-                    throw new Error(
-                        "Local media unavailable"
-                    );
+                        socketOwners.delete(
+                            socketId
+                        );
+                    }
                 }
 
-                var response =
-                    await fetch(
-                        "/api/livekit-token?room=" +
-                        encodeURIComponent(
-                            roomName
+                let kickedCount =
+                    0;
+
+                for (
+                    const [
+                        roomName,
+                        matchData
+                    ]
+                        of matchRooms
+                ) {
+                    if (
+                        !matchData.userIds ||
+                        !matchData.userIds.includes(
+                            report.targetUserId
                         )
+                    ) {
+                        continue;
+                    }
+
+                    await kickUserFromRoom(
+                        roomName,
+                        report.targetUserId
                     );
 
-                if (!response.ok) {
-
-                    var tokenError =
-                        await response
-                            .json()
-                            .catch(
-                                function () {
-                                    return {};
-                                }
-                            );
+                    const targetIndex =
+                        matchData.userIds.indexOf(
+                            report.targetUserId
+                        );
 
                     if (
-                        tokenError.error ===
-                        "USER_BANNED"
+                        targetIndex !==
+                        -1
                     ) {
+                        const targetSocket =
+                            matchData.users[
+                                targetIndex
+                            ];
 
-                        connected =
-                            false;
+                        if (
+                            targetSocket
+                        ) {
+                            matchData.endedFor.add(
+                                targetSocket
+                            );
 
-                        searching =
-                            false;
+                            socketOwners.delete(
+                                targetSocket
+                            );
 
-                        showBanModal(
-                            tokenError.reason,
-                            tokenError.expiresAt
-                        );
-
-                        updateButtons();
-                        updateChatStatus();
-
-                        return;
+                            kickedCount++;
+                        }
                     }
-
-                    throw new Error(
-                        "Не удалось получить LiveKit token"
-                    );
                 }
 
-                var tokenData =
-                    await response.json();
-
-                room =
-                    new Room({
-                        adaptiveStream:
-                            true,
-
-                        dynacast:
-                            true
-                    });
-
-                room.on(
-                    RoomEvent.DataReceived,
-                    handleChatData
-                );
-
-                room.on(
-                    RoomEvent.TrackSubscribed,
-                    function (track) {
-
-                        if (
-                            track.kind ===
-                            Track.Kind.Video
-                        ) {
-
-                            attachRemote(
-                                track
-                            );
-                        }
-
-                        if (
-                            track.kind ===
-                            Track.Kind.Audio
-                        ) {
-
-                            attachAudio(
-                                track
-                            );
-                        }
-                    }
-                );
-
-                room.on(
-                    RoomEvent.TrackUnsubscribed,
-                    function (track) {
-
-                        try {
-
-                            track.detach(
-                                remoteVideo
-                            );
-
-                        } catch (error) {}
-
-                        try {
-
-                            track.detach();
-
-                        } catch (error) {}
-                    }
-                );
-
-                room.on(
-                    RoomEvent.ParticipantDisconnected,
-                    function (
-                        participant
-                    ) {
-
-                        console.log(
-                            "PARTICIPANT DISCONNECTED:",
-                            participant.identity
-                        );
-
-                        if (
-                            leavingLocally
-                        ) {
-                            return;
-                        }
-
-                        connected =
-                            false;
-
-                        searching =
-                            false;
-
-                        if (checkTimer) {
-
-                            clearInterval(
-                                checkTimer
-                            );
-
-                            checkTimer =
-                                null;
-                        }
-
-                        resetTimer();
-                        clearRemote();
-                        clearChat();
-                        resetChatHistory();
-
-                        resetReportUI();
-
-                        setStatus(
-                            "Собеседник отключился"
-                        );
-
-                        updateButtons();
-                        updateChatStatus();
-                    }
-                );
-
-                room.on(
-                    RoomEvent.Disconnected,
-                    function () {
-
-                        if (
-                            leavingLocally
-                        ) {
-                            return;
-                        }
-
-                        connected =
-                            false;
-
-                        searching =
-                            false;
-
-                        if (checkTimer) {
-
-                            clearInterval(
-                                checkTimer
-                            );
-
-                            checkTimer =
-                                null;
-                        }
-
-                        resetTimer();
-                        clearRemote();
-                        clearChat();
-                        resetChatHistory();
-
-                        resetReportUI();
-
-                        setStatus(
-                            "Соединение завершено"
-                        );
-
-                        updateButtons();
-                        updateChatStatus();
-                    }
-                );
-
-                await room.connect(
-                    tokenData.url,
-                    tokenData.token
-                );
-
-                microphoneMuted =
-                    false;
-
-                cameraMuted =
-                    false;
-
-                reportSentThisConnection =
-                    false;
-
-                resetChatHistory();
-
-                micButton.textContent =
-                    "🎤 Микрофон";
-
-                cameraButton.textContent =
-                    "📷 Камера";
-
-                reportButton.textContent =
-                    "🚩 Пожаловаться";
-
-                await room
-                    .localParticipant
-                    .publishTrack(
-                        localVideoTrack
-                    );
-
-                await room
-                    .localParticipant
-                    .publishTrack(
-                        localAudioTrack
-                    );
-
-                room
-                    .remoteParticipants
-                    .forEach(
-                        function (
-                            participant
-                        ) {
-
-                            participant
-                                .trackPublications
-                                .forEach(
-                                    function (
-                                        publication
-                                    ) {
-
-                                        if (
-                                            !publication.track
-                                        ) {
-                                            return;
-                                        }
-
-                                        if (
-                                            publication
-                                                .track
-                                                .kind ===
-                                            Track.Kind.Video
-                                        ) {
-
-                                            attachRemote(
-                                                publication.track
-                                            );
-                                        }
-
-                                        if (
-                                            publication
-                                                .track
-                                                .kind ===
-                                            Track.Kind.Audio
-                                        ) {
-
-                                            attachAudio(
-                                                publication.track
-                                            );
-                                        }
-                                    }
-                                );
-                        }
-                    );
-
-                connected =
-                    true;
-
-                searching =
-                    false;
-
-                showPeerInfo(
-                    peer
-                );
-
-                clearChat();
-
-                startTimer();
-
-                setStatus(
-                    "Собеседник подключён"
-                );
-
-                updateButtons();
-                updateChatStatus();
-
-                if (
-                    window.innerWidth >
-                    600
-                ) {
-
-                    chatInput.focus();
-                }
-
-                if (checkTimer) {
-
-                    clearInterval(
-                        checkTimer
-                    );
-                }
-
-                checkTimer =
-                    setInterval(
-                        checkMatch,
-                        1000
-                    );
-
-            } catch (error) {
-
-                console.error(
-                    "LIVEKIT ERROR:",
-                    error
-                );
-
-                connected =
-                    false;
-
-                searching =
-                    false;
-
-                resetTimer();
-                clearChat();
-                resetChatHistory();
-
-                resetReportUI();
-
-                setStatus(
-                    error.message ===
-                        "Пользователь заблокирован"
-                        ? "Ваш доступ заблокирован"
-                        : "Ошибка подключения"
-                );
-
-                updateButtons();
-                updateChatStatus();
+                return res.json({
+                    status:
+                        "ok",
+
+                    ban:
+                        ban,
+
+                    kickedRooms:
+                        kickedCount
+                });
             }
+
+            return res.status(400).json({
+                error:
+                    "Unknown action"
+            });
+
+        } catch (error) {
+            console.error(
+                "Admin report action error:",
+                error
+            );
+
+            return res.status(500).json({
+                error:
+                    "Failed to process report"
+            });
+        }
+    }
+);
+
+/* =========================
+   ADMIN BANS
+   ========================= */
+
+app.get(
+    "/api/admin/bans",
+    requireAdmin,
+    function (
+        req,
+        res
+    ) {
+        const bans =
+            readBans();
+
+        const now =
+            Date.now();
+
+        const activeBans =
+            bans.filter(
+                function (
+                    ban
+                ) {
+                    if (
+                        ban.expiresAt &&
+                        new Date(
+                            ban.expiresAt
+                        ).getTime() <=
+                            now
+                    ) {
+                        return false;
+                    }
+
+                    return true;
+                }
+            );
+
+        if (
+            activeBans.length !==
+            bans.length
+        ) {
+            writeBans(
+                activeBans
+            );
         }
 
-        /* =========================
-           SEARCH
-           ========================= */
+        return res.json({
+            bans:
+                activeBans
+        });
+    }
+);
 
-        async function startSearch() {
+/* =========================
+   ADMIN UNBAN
+   ========================= */
 
-            if (
-                searching ||
-                connected ||
-                currentBanExpiresAt
+app.post(
+    "/api/admin/bans/:userId/unban",
+    requireAdmin,
+    function (
+        req,
+        res
+    ) {
+        const userId =
+            req.params.userId;
+
+        const bans =
+            readBans();
+
+        const updated =
+            bans.filter(
+                function (
+                    ban
+                ) {
+                    return (
+                        ban.userId !==
+                        userId
+                    );
+                }
+            );
+
+        writeBans(
+            updated
+        );
+
+        return res.json({
+            status:
+                "ok"
+        });
+    }
+);
+
+/* =========================
+   ADMIN STATISTICS
+   ========================= */
+
+app.get(
+    "/api/admin/stats",
+    requireAdmin,
+    function (
+        req,
+        res
+    ) {
+        try {
+            const stats =
+                readStats();
+
+            const now =
+                Date.now();
+
+            const users =
+                Object.values(
+                    stats.users || {}
+                );
+
+            const totalUsers =
+                users.length;
+
+            const dayMs =
+                24 *
+                60 *
+                60 *
+                1000;
+
+            const todayStart =
+                new Date();
+
+            todayStart.setHours(
+                0,
+                0,
+                0,
+                0
+            );
+
+            const todayTimestamp =
+                todayStart.getTime();
+
+            const sevenDaysAgo =
+                now -
+                7 *
+                dayMs;
+
+            const thirtyDaysAgo =
+                now -
+                30 *
+                dayMs;
+
+            const newToday =
+                users.filter(
+                    function (
+                        user
+                    ) {
+                        return (
+                            new Date(
+                                user.firstSeenAt
+                            ).getTime() >=
+                            todayTimestamp
+                        );
+                    }
+                ).length;
+
+            const new7Days =
+                users.filter(
+                    function (
+                        user
+                    ) {
+                        return (
+                            new Date(
+                                user.firstSeenAt
+                            ).getTime() >=
+                            sevenDaysAgo
+                        );
+                    }
+                ).length;
+
+            const new30Days =
+                users.filter(
+                    function (
+                        user
+                    ) {
+                        return (
+                            new Date(
+                                user.firstSeenAt
+                            ).getTime() >=
+                            thirtyDaysAgo
+                        );
+                    }
+                ).length;
+
+            /*
+             * Активные пользователи.
+             *
+             * Это пользователи, которые прямо сейчас
+             * находятся в поиске, матче или LiveKit.
+             */
+            const activeUserIds =
+                new Set();
+
+            const searchingUserIds =
+                new Set();
+
+            const inCallUserIds =
+                new Set();
+
+            for (
+                const user
+                of waitingUsers.values()
             ) {
-                return;
+                if (user.userId) {
+                    activeUserIds.add(
+                        user.userId
+                    );
+
+                    searchingUserIds.add(
+                        user.userId
+                    );
+                }
             }
 
-            if (!myGender) {
-                setStatus("Сначала выберите свой пол");
-                return;
+            for (
+                const matchData
+                of matchRooms.values()
+            ) {
+                if (
+                    Array.isArray(
+                        matchData.userIds
+                    )
+                ) {
+                    for (
+                        const userId
+                        of matchData.userIds
+                    ) {
+                        if (userId) {
+                            activeUserIds.add(
+                                userId
+                            );
+
+                            inCallUserIds.add(
+                                userId
+                            );
+                        }
+                    }
+                }
+            }
+
+            for (
+                const roomUsers
+                of liveKitParticipants.values()
+            ) {
+                for (
+                    const userId
+                    of roomUsers.keys()
+                ) {
+                    if (userId) {
+                        activeUserIds.add(
+                            userId
+                        );
+
+                        inCallUserIds.add(
+                            userId
+                        );
+                    }
+                }
             }
 
             /*
-             * ВАЖНО:
-             * Сначала создаём ID поиска и отправляем запрос на сервер.
-             * Камера/микрофон запускаются отдельно и не должны блокировать
-             * саму кнопку поиска.
+             * Страны.
              */
-            searching = true;
+            const countries =
+                {};
 
-            resetTimer();
-            clearChat();
-            resetChatHistory();
-            resetReportUI();
+            const activeCountries =
+                {};
 
-            socketId =
-                "ice_" +
-                Date.now() +
-                "_" +
-                Math.random()
-                    .toString(36)
-                    .substring(2, 10);
-
-            updateButtons();
-            updateChatStatus();
-
-            setStatus("Поиск собеседника...");
-
-            try {
-
-                var response =
-                    await fetch(
-                        "/api/match/start",
-                        {
-                            method: "POST",
-
-                            headers: {
-                                "Content-Type":
-                                    "application/json"
-                            },
-
-                            body:
-                                JSON.stringify({
-                                    socketId:
-                                        socketId,
-
-                                    gender:
-                                        myGender,
-
-                                    searchGender:
-                                        searchGender
-                                })
-                        }
-                    );
-
-                var data = {};
-
-                try {
-                    data = await response.json();
-                } catch (jsonError) {
-                    throw new Error(
-                        "Сервер вернул некорректный ответ"
-                    );
-                }
-
-                if (
-                    response.status === 403 &&
-                    data.error ===
-                        "USER_BANNED"
+            users.forEach(
+                function (
+                    user
                 ) {
-                    searching = false;
-
-                    connected = false;
-
-                    showBanModal(
-                        data.reason,
-                        data.expiresAt
-                    );
-
-                    updateButtons();
-                    updateChatStatus();
-
-                    return;
-                }
-
-                if (!response.ok) {
-                    throw new Error(
-                        data.error ||
-                        "Ошибка запуска поиска"
-                    );
-                }
-
-                console.log(
-                    "MATCH START:",
-                    data
-                );
-
-                if (
-                    data.status === "matched" &&
-                    data.roomName
-                ) {
-
-                    searching = false;
-
-                    if (checkTimer) {
-                        clearInterval(checkTimer);
-                        checkTimer = null;
-                    }
-
-                    /*
-                     * Камера и микрофон запускаются перед входом
-                     * в LiveKit. Если разрешения уже есть — всё
-                     * подключится автоматически.
-                     */
-                    await connectToRoom(
-                        data.roomName,
-                        data.peer || null
-                    );
-
-                    return;
-                }
-
-                if (
-                    data.status === "waiting"
-                ) {
-
-                    /*
-                     * Мы уже стоим в очереди.
-                     * Запускаем проверку матча независимо от камеры.
-                     */
-                    setStatus(
-                        "Поиск собеседника..."
-                    );
-
-                    if (checkTimer) {
-                        clearInterval(checkTimer);
-                    }
-
-                    checkTimer =
-                        setInterval(
-                            checkMatch,
-                            1000
-                        );
-
-                    /*
-                     * Пробуем открыть локальные устройства
-                     * параллельно. Ошибка камеры не отменяет
-                     * сам поиск.
-                     */
-                    startLocalMedia()
-                        .then(function (ready) {
-                            if (!ready) {
-                                console.warn(
-                                    "Камера/микрофон пока недоступны, но поиск продолжается."
-                                );
-                            }
-                        })
-                        .catch(function (error) {
-                            console.warn(
-                                "MEDIA START ERROR:",
-                                error
-                            );
-                        });
-
-                    updateButtons();
-                    updateChatStatus();
-
-                    return;
-                }
-
-                throw new Error(
-                    "Неизвестный ответ сервера: " +
-                    String(data.status || "unknown")
-                );
-
-            } catch (error) {
-
-                console.error(
-                    "MATCH ERROR:",
-                    error
-                );
-
-                searching = false;
-
-                if (checkTimer) {
-                    clearInterval(checkTimer);
-                    checkTimer = null;
-                }
-
-                setStatus(
-                    "Ошибка поиска: " +
-                    (
-                        error &&
-                        error.message
-                            ? error.message
-                            : "неизвестная ошибка"
-                    )
-                );
-
-                updateButtons();
-                updateChatStatus();
-            }
-        }
-
-        /* =========================
-           CHECK MATCH
-           ========================= */
-
-        async function checkMatch() {
-
-            if (
-                (
-                    !searching &&
-                    !connected
-                ) ||
-                !socketId
-            ) {
-                return;
-            }
-
-            try {
-
-                var response =
-                    await fetch(
-                        "/api/match/check?socketId=" +
-                        encodeURIComponent(
-                            socketId
-                        )
-                    );
-
-                if (!response.ok) {
-                    return;
-                }
-
-                var data =
-                    await response.json();
-
-                console.log(
-                    "MATCH CHECK:",
-                    data
-                );
-
-                if (
-                    data.status ===
-                    "peerLeft"
-                ) {
-
-                    if (checkTimer) {
-
-                        clearInterval(
-                            checkTimer
-                        );
-
-                        checkTimer =
-                            null;
-                    }
-
-                    if (room) {
-
-                        leavingLocally =
-                            true;
-
-                        try {
-
-                            room.disconnect();
-
-                        } catch (error) {}
-
-                        room =
-                            null;
-
-                        leavingLocally =
-                            false;
-                    }
-
-                    connected =
-                        false;
-
-                    searching =
-                        false;
-
-                    resetTimer();
-                    clearRemote();
-                    clearChat();
-                    resetChatHistory();
-                    resetReportUI();
-
-                    setStatus(
-                        "Собеседник отключился"
-                    );
-
-                    updateButtons();
-                    updateChatStatus();
-
-                    return;
-                }
-
-                if (
-                    data.status ===
-                    "ended"
-                ) {
-                    return;
-                }
-
-                if (
-                    data.status ===
-                        "matched" &&
-                    data.roomName
-                ) {
-
-                    if (checkTimer) {
-
-                        clearInterval(
-                            checkTimer
-                        );
-
-                        checkTimer =
-                            null;
-                    }
-
-                    await connectToRoom(
-                        data.roomName,
-                        data.peer ||
-                        null
-                    );
-                }
-
-            } catch (error) {
-
-                console.error(
-                    "CHECK ERROR:",
-                    error
-                );
-            }
-        }
-
-        /* =========================
-           CLEAR REMOTE
-           ========================= */
-
-        function clearRemote() {
-
-            if (remoteVideo) {
-
-                try {
-
-                    remoteVideo.srcObject =
-                        null;
-
-                } catch (error) {}
-            }
-
-            if (remotePlaceholder) {
-
-                remotePlaceholder
-                    .style
-                    .display =
-                    "flex";
-            }
-
-            if (remoteInfo) {
-
-                remoteInfo
-                    .classList
-                    .add(
-                        "hidden"
-                    );
-            }
-
-            if (remoteAudio) {
-
-                try {
-                    remoteAudio.pause();
-                } catch (error) {}
-
-                try {
-                    remoteAudio.remove();
-                } catch (error) {}
-
-                remoteAudio =
-                    null;
-            }
-        }
-
-        /* =========================
-           STOP
-           ========================= */
-
-        async function stopEverything() {
-
-            closeReportModal();
-
-            if (checkTimer) {
-
-                clearInterval(
-                    checkTimer
-                );
-
-                checkTimer =
-                    null;
-            }
-
-            searching =
-                false;
-
-            resetTimer();
-
-            var oldSocketId =
-                socketId;
-
-            try {
-
-                if (oldSocketId) {
-
-                    await fetch(
-                        "/api/match/stop",
-                        {
-                            method:
-                                "POST",
-
-                            headers: {
-                                "Content-Type":
-                                    "application/json"
-                            },
-
-                            body:
-                                JSON.stringify({
-                                    socketId:
-                                        oldSocketId
-                                })
-                        }
-                    );
-                }
-
-            } catch (error) {
-
-                console.error(
-                    "STOP ERROR:",
-                    error
-                );
-            }
-
-            leavingLocally =
-                true;
-
-            if (room) {
-
-                try {
-
-                    room.disconnect();
-
-                } catch (error) {}
-
-                room =
-                    null;
-            }
-
-            leavingLocally =
-                false;
-
-            connected =
-                false;
-
-            socketId =
-                null;
-
-            if (localVideoTrack) {
-
-                try {
-                    localVideoTrack.stop();
-                } catch (error) {}
-
-                localVideoTrack =
-                    null;
-            }
-
-            if (localAudioTrack) {
-
-                try {
-                    localAudioTrack.stop();
-                } catch (error) {}
-
-                localAudioTrack =
-                    null;
-            }
-
-            if (localVideo) {
-
-                try {
-
-                    localVideo.srcObject =
-                        null;
-
-                } catch (error) {}
-            }
-
-            clearRemote();
-            clearChat();
-            resetChatHistory();
-            resetReportUI();
-
-            cameraFacingMode =
-                "user";
-
-            microphoneMuted =
-                false;
-
-            cameraMuted =
-                false;
-
-            micButton.textContent =
-                "🎤 Микрофон";
-
-            cameraButton.textContent =
-                "📷 Камера";
-
-            if (
-                currentBanExpiresAt
-            ) {
-
-                setStatus(
-                    "Доступ заблокирован"
-                );
-
-            } else {
-
-                setStatus(
-                    "Готов к поиску"
-                );
-            }
-
-            updateButtons();
-            updateChatStatus();
-        }
-
-        /* =========================
-           MY GENDER
-           ========================= */
-
-        document
-            .querySelectorAll(
-                "[data-my-gender]"
-            )
-            .forEach(
-                function (button) {
-
-                    button.addEventListener(
-                        "click",
-                        function () {
-
-                            if (
-                                currentBanExpiresAt
-                            ) {
-                                return;
-                            }
-
-                            myGender =
-                                button
-                                    .getAttribute(
-                                        "data-my-gender"
-                                    );
-
-                            document
-                                .querySelectorAll(
-                                    "[data-my-gender]"
-                                )
-                                .forEach(
-                                    function (
-                                        item
-                                    ) {
-
-                                        item
-                                            .classList
-                                            .remove(
-                                                "selected"
-                                            );
-                                    }
-                                );
-
-                            button.classList.add(
-                                "selected"
-                            );
-
-                            setStatus(
-                                "Пол выбран"
-                            );
-                        }
-                    );
-                }
-            );
-
-        /* =========================
-           SEARCH GENDER
-           ========================= */
-
-        document
-            .querySelectorAll(
-                "[data-search-gender]"
-            )
-            .forEach(
-                function (button) {
-
-                    button.addEventListener(
-                        "click",
-                        function () {
-
-                            if (
-                                currentBanExpiresAt
-                            ) {
-                                return;
-                            }
-
-                            searchGender =
-                                button
-                                    .getAttribute(
-                                        "data-search-gender"
-                                    );
-
-                            document
-                                .querySelectorAll(
-                                    "[data-search-gender]"
-                                )
-                                .forEach(
-                                    function (
-                                        item
-                                    ) {
-
-                                        item
-                                            .classList
-                                            .remove(
-                                                "selected"
-                                            );
-                                    }
-                                );
-
-                            button.classList.add(
-                                "selected"
-                            );
-                        }
-                    );
-                }
-            );
-
-        /* =========================
-           MICROPHONE
-           ========================= */
-
-        micButton.addEventListener(
-            "click",
-            function () {
-
-                if (!localAudioTrack) {
-                    return;
-                }
-
-                try {
-
-                    if (
-                        microphoneMuted
-                    ) {
-
-                        localAudioTrack.unmute();
-
-                        microphoneMuted =
-                            false;
-
-                        micButton.textContent =
-                            "🎤 Микрофон";
-
-                    } else {
-
-                        localAudioTrack.mute();
-
-                        microphoneMuted =
-                            true;
-
-                        micButton.textContent =
-                            "🔇 Микрофон";
-                    }
-
-                } catch (error) {
-
-                    console.error(
-                        "MIC ERROR:",
-                        error
-                    );
-                }
-            }
-        );
-
-        /* =========================
-           CAMERA
-           ========================= */
-
-        cameraButton.addEventListener(
-            "click",
-            function () {
-
-                if (!localVideoTrack) {
-                    return;
-                }
-
-                try {
-
-                    if (
-                        cameraMuted
-                    ) {
-
-                        localVideoTrack.unmute();
-
-                        cameraMuted =
-                            false;
-
-                        cameraButton.textContent =
-                            "📷 Камера";
-
-                    } else {
-
-                        localVideoTrack.mute();
-
-                        cameraMuted =
-                            true;
-
-                        cameraButton.textContent =
-                            "🚫 Камера";
-                    }
-
-                } catch (error) {
-
-                    console.error(
-                        "CAMERA ERROR:",
-                        error
-                    );
-                }
-            }
-        );
-
-        /* =========================
-           CAMERA SWITCH
-           ========================= */
-
-        cameraSwitchButton.addEventListener(
-            "click",
-            function () {
-
-                switchCamera();
-            }
-        );
-
-        /* =========================
-           FIND
-           ========================= */
-
-        joinButton.addEventListener(
-            "click",
-            function () {
-
-                console.log("ICECHAT: Нажата кнопка «Найти собеседника»");
-
-                if (
-                    searching ||
-                    connected ||
-                    currentBanExpiresAt
-                ) {
-                    return;
-                }
-
-                startSearch().catch(function (error) {
-                    console.error(
-                        "START SEARCH CLICK ERROR:",
-                        error
-                    );
-
-                    searching = false;
-                    updateButtons();
-                    updateChatStatus();
-
-                    setStatus(
-                        "Ошибка поиска: " +
+                    const name =
+                        user.countryName ||
+                        "Неизвестно";
+
+                    countries[name] =
                         (
-                            error &&
-                            error.message
-                                ? error.message
-                                : "неизвестная ошибка"
+                            countries[name] ||
+                            0
+                        ) + 1;
+                }
+            );
+
+            /*
+             * Более быстрый и точный подсчёт
+             * активных стран.
+             */
+            Object.keys(
+                stats.users
+            ).forEach(
+                function (
+                    userId
+                ) {
+                    if (
+                        !activeUserIds.has(
+                            userId
                         )
-                    );
-                });
-            }
-        );
+                    ) {
+                        return;
+                    }
 
-        /* =========================
-           STOP
-           ========================= */
+                    const user =
+                        stats.users[
+                            userId
+                        ];
 
-        leaveButton.addEventListener(
-            "click",
-            function () {
+                    const name =
+                        user.countryName ||
+                        "Неизвестно";
 
-                stopEverything();
-            }
-        );
-
-        /* =========================
-           CHAT SEND
-           ========================= */
-
-        chatForm.addEventListener(
-            "submit",
-            function (event) {
-
-                event.preventDefault();
-
-                if (!connected) {
-                    return;
+                    activeCountries[name] =
+                        (
+                            activeCountries[name] ||
+                            0
+                        ) + 1;
                 }
+            );
 
-                var text =
-                    chatInput.value.trim();
+            /*
+             * Пол.
+             */
+            const genders = {
+                male: 0,
+                female: 0,
+                unknown: 0
+            };
 
-                if (!text) {
-                    return;
-                }
+            const searchGenders = {
+                male: 0,
+                female: 0,
+                any: 0
+            };
 
-                chatInput.value =
-                    "";
-
-                sendChatMessage(
-                    text
-                );
-            }
-        );
-
-        chatInput.addEventListener(
-            "keydown",
-            function (event) {
-
-                if (
-                    event.key ===
-                        "Enter" &&
-                    !event.shiftKey
+            users.forEach(
+                function (
+                    user
                 ) {
-
-                    event.preventDefault();
-
-                    chatForm.requestSubmit();
-                }
-            }
-        );
-
-        /* =========================
-           ESCAPE
-           ========================= */
-
-        document.addEventListener(
-            "keydown",
-            function (event) {
-
-                if (
-                    event.key ===
-                    "Escape"
-                ) {
+                    if (
+                        user.gender ===
+                        "male"
+                    ) {
+                        genders.male++;
+                    } else if (
+                        user.gender ===
+                        "female"
+                    ) {
+                        genders.female++;
+                    } else {
+                        genders.unknown++;
+                    }
 
                     if (
-                        !rulesModal
-                            .classList
-                            .contains(
-                                "hidden"
-                            )
+                        user.searchGender ===
+                        "male"
                     ) {
-
-                        return;
-
+                        searchGenders.male++;
                     } else if (
-                        !reportModal
-                            .classList
-                            .contains(
-                                "hidden"
-                            )
+                        user.searchGender ===
+                        "female"
                     ) {
-
-                        closeReportModal();
-
-                    } else if (
-                        !banModal
-                            .classList
-                            .contains(
-                                "hidden"
-                            )
-                    ) {
-
-                        banModal
-                            .classList
-                            .add(
-                                "hidden"
-                            );
+                        searchGenders.female++;
+                    } else {
+                        searchGenders.any++;
                     }
                 }
-            }
-        );
+            );
 
-        /* =========================
-           INIT
-           ========================= */
+            const totals =
+                stats.totals || {};
 
-        resetChatHistory();
-        resetReportUI();
+            const searchesStarted =
+                Number(
+                    totals.searchesStarted ||
+                    0
+                );
 
-        updateButtons();
-        updateChatStatus();
+            const searchesMatched =
+                Number(
+                    totals.searchesMatched ||
+                    0
+                );
 
-        clearChat();
-        resetTimer();
+            const searchesCancelled =
+                Number(
+                    totals.searchesCancelled ||
+                    0
+                );
 
-        setStatus(
-            "Готов к поиску"
-        );
+            const searchesTimedOut =
+                Number(
+                    totals.searchesTimedOut ||
+                    0
+                );
 
-        initRules();
+            const sessionsCompleted =
+                Number(
+                    totals.sessionsCompleted ||
+                    0
+                );
 
-        console.log(
-            "ICECHAT READY"
+            const totalDurationMs =
+                Number(
+                    totals.totalCallDurationMs ||
+                    0
+                );
+
+            const longestDurationMs =
+                Number(
+                    totals.longestCallDurationMs ||
+                    0
+                );
+
+            const averageDurationMs =
+                sessionsCompleted > 0
+                    ? Math.round(
+                        totalDurationMs /
+                        sessionsCompleted
+                    )
+                    : 0;
+
+            const matchSuccessRate =
+                searchesStarted > 0
+                    ? Number(
+                        (
+                            searchesMatched /
+                            searchesStarted *
+                            100
+                        ).toFixed(1)
+                    )
+                    : 0;
+
+            /*
+             * Модерация.
+             */
+            const reports =
+                readReports();
+
+            const bans =
+                readBans();
+
+            const reportStats = {
+                total:
+                    reports.length,
+
+                new:
+                    reports.filter(
+                        function (
+                            report
+                        ) {
+                            return (
+                                report.status ===
+                                "new"
+                            );
+                        }
+                    ).length,
+
+                rejected:
+                    reports.filter(
+                        function (
+                            report
+                        ) {
+                            return (
+                                report.status ===
+                                "rejected"
+                            );
+                        }
+                    ).length,
+
+                warnings:
+                    reports.filter(
+                        function (
+                            report
+                        ) {
+                            return (
+                                report.status ===
+                                "warning"
+                            );
+                        }
+                    ).length,
+
+                banned:
+                    reports.filter(
+                        function (
+                            report
+                        ) {
+                            return (
+                                report.status ===
+                                "banned"
+                            );
+                        }
+                    ).length
+            };
+
+            const activeBans =
+                bans.filter(
+                    function (
+                        ban
+                    ) {
+                        if (
+                            !ban.expiresAt
+                        ) {
+                            return true;
+                        }
+
+                        return (
+                            new Date(
+                                ban.expiresAt
+                            ).getTime() >
+                            now
+                        );
+                    }
+                );
+
+            /*
+             * Последние 30 дней по дням.
+             */
+            const daily =
+                {};
+
+            Object.keys(
+                stats.daily || {}
+            )
+                .sort()
+                .slice(-30)
+                .forEach(
+                    function (
+                        date
+                    ) {
+                        daily[date] =
+                            stats.daily[
+                                date
+                            ];
+                    }
+                );
+
+            return res.json({
+                status:
+                    "ok",
+
+                generatedAt:
+                    new Date().toISOString(),
+
+                users: {
+                    total:
+                        totalUsers,
+
+                    online:
+                        activeUserIds.size,
+
+                    searching:
+                        searchingUserIds.size,
+
+                    inCall:
+                        inCallUserIds.size,
+
+                    newToday:
+                        newToday,
+
+                    new7Days:
+                        new7Days,
+
+                    new30Days:
+                        new30Days
+                },
+
+                matching: {
+                    searchesStarted:
+                        searchesStarted,
+
+                    searchesMatched:
+                        searchesMatched,
+
+                    searchesCancelled:
+                        searchesCancelled,
+
+                    searchesTimedOut:
+                        searchesTimedOut,
+
+                    matchSuccessRate:
+                        matchSuccessRate
+                },
+
+                calls: {
+                    total:
+                        sessionsCompleted,
+
+                    averageDurationMs:
+                        averageDurationMs,
+
+                    longestDurationMs:
+                        longestDurationMs,
+
+                    callsUnder10Seconds:
+                        Number(
+                            totals.callsUnder10Seconds ||
+                            0
+                        )
+                },
+
+                countries:
+                    countries,
+
+                activeCountries:
+                    activeCountries,
+
+                genders:
+                    genders,
+
+                searchGenders:
+                    searchGenders,
+
+                moderation:
+                    {
+                        reports:
+                            reportStats,
+
+                        activeBans:
+                            activeBans.length,
+
+                        totalBans:
+                            bans.length
+                    },
+
+                technical: {
+                    uptimeSeconds:
+                        Math.floor(
+                            process.uptime()
+                        ),
+
+                    memory: {
+                        rss:
+                            process.memoryUsage()
+                                .rss,
+
+                        heapUsed:
+                            process.memoryUsage()
+                                .heapUsed,
+
+                        heapTotal:
+                            process.memoryUsage()
+                                .heapTotal
+                    },
+
+                    waiting:
+                        waitingUsers.size,
+
+                    matches:
+                        matches.size,
+
+                    rooms:
+                        matchRooms.size,
+
+                    livekitRooms:
+                        liveKitParticipants.size,
+
+                    livekitEnabled:
+                        Boolean(
+                            liveKitRoomService
+                        )
+                },
+
+                daily:
+                    daily
+            });
+
+        } catch (error) {
+            console.error(
+                "Admin stats error:",
+                error
+            );
+
+            return res.status(500).json({
+                error:
+                    "Failed to load statistics"
+            });
+        }
+    }
+);
+
+/* =========================
+   ADMIN PAGE
+   ========================= */
+
+app.get(
+    "/admin",
+    function (
+        req,
+        res
+    ) {
+        return res.sendFile(
+            path.join(
+                __dirname,
+                "admin.html"
+            )
         );
     }
 );
-</script>
 
-<script>
-(function () {
-    var languageButton = document.getElementById("languageButton");
-    if (!languageButton) return;
+/* =========================
+   ROOT PAGE
+   ========================= */
 
-    var currentLanguage = localStorage.getItem("icechat_language") || "ru";
-    var rulesContent = document.querySelector(".rules-content");
-    var rulesRuHTML = rulesContent ? rulesContent.innerHTML : "";
-
-    var translations = {
-        "Готов к поиску": "Ready to search",
-        "Поиск собеседника...": "Searching for a stranger...",
-        "Собеседник подключён": "Stranger connected",
-        "Собеседник отключился": "Stranger disconnected",
-        "Соединение завершено": "Connection ended",
-        "Доступ заблокирован": "Access blocked",
-        "Блокировка закончилась": "Ban ended",
-        "Не удалось отправить сообщение": "Failed to send message",
-        "Правила": "Rules",
-        "💎 Поддержать Ice Chat": "💎 Support Ice Chat",
-        "Ваш пол": "Your gender",
-        "Искать собеседника": "Search for",
-        "♂ Мужчина": '<span class="gender-symbol male">♂</span> Male',
-        "♀ Женщина": '<span class="gender-symbol female">♀</span> Female',
-        "Оба": "Both",
-        "Найдите собеседника": "Find a stranger",
-        "👤 Собеседник": "👤 Stranger",
-        "Собеседник": "Stranger",
-        "Вы": "You",
-        "💬 Чат": "💬 Chat",
-        "Нет соединения": "Not connected",
-        "Ожидание собеседника...": "Waiting for a stranger...",
-        "Здесь появятся сообщения": "Messages will appear here",
-        "Напишите сообщение...": "Write a message...",
-        "Отправить": "Send",
-        "🔎 Найти собеседника": "🔎 Find a stranger",
-        "🎤 Микрофон": "🎤 Microphone",
-        "📷 Камера": "📷 Camera",
-        "🔄 Камера": "🔄 Camera",
-        "🚩 Пожаловаться": "🚩 Report",
-        "📋 Правила IceChat": "📋 IceChat Rules",
-        "Ознакомьтесь с правилами перед входом в видеочат. IceChat доступен только пользователям 18+.": "Please read the rules before entering the video chat. IceChat is available only to users aged 18+.",
-        "Я ознакомился с правилами и мне исполнилось 18 лет.": "I have read the rules and I am 18 or older.",
-        "Продолжить": "Continue",
-        "Понятно": "Got it",
-        "Выберите причину жалобы": "Choose a report reason",
-        "Оскорбления или токсичное поведение": "Insults or toxic behavior",
-        "Непристойный контент": "Sexual or inappropriate content",
-        "Спам или реклама": "Spam or advertising",
-        "Опасное или незаконное поведение": "Dangerous or illegal behavior",
-        "Другое": "Other",
-        "Дополнительная информация (необязательно)": "Additional information (optional)",
-        "Отмена": "Cancel",
-        "Отправить жалобу": "Submit report",
-        "Причина": "Reason",
-        "Срок": "Duration",
-        "Заблокирован до": "Blocked until",
-        "Навсегда": "Permanent",
-        "Нарушение правил": "Rule violation",
-        "Соединение не установлено": "Connection not established"
-    };
-
-    var reportMap = {
-        "Оскорбления или токсичное поведение": "Insults or toxic behavior",
-        "Непристойный контент": "Sexual or inappropriate content",
-        "Спам или реклама": "Spam or advertising",
-        "Опасное или незаконное поведение": "Dangerous or illegal behavior",
-        "Другое": "Other"
-    };
-
-    var ruReasons = Object.keys(reportMap);
-
-    var englishRules = `
-        <h3>Welcome to IceChat! 👋</h3>
-        <p><strong>IceChat</strong> is a random 1-on-1 video chat roulette that lets you talk to people from different countries and meet new strangers.</p>
-
-        <h3>🧊 Why IceChat?</h3>
-        <p>We want random communication to be simple and accessible. That's why <strong>gender selection in IceChat is completely free</strong>.</p>
-        <p>Unlike many other services where gender search may only be available for a fee, <strong>IceChat</strong> provides this feature for free, with no subscription or additional payments.</p>
-
-        <h3>📋 IceChat Rules</h3>
-        <p><strong>1. IceChat is intended only for users aged 18 and older.</strong> By using the service and pressing “Continue”, you confirm that you are 18 or older. Users under 18 are not allowed to use IceChat.</p>
-        <p><strong>2. Respect other users.</strong> Insults, bullying, threats, harassment, deliberate humiliation, and other aggressive behavior are prohibited.</p>
-        <p><strong>3. Explicit content is prohibited.</strong> Do not display or distribute sexual, pornographic, or otherwise clearly inappropriate content.</p>
-        <p><strong>4. Sexual behavior involving minors is prohibited.</strong> Any sexual acts, offers, or display of sexual content to minors are prohibited.</p>
-        <p><strong>5. Do not attempt to bypass age restrictions or provide deliberately false age information.</strong></p>
-        <p><strong>6. Do not record or distribute other users’ video without their consent.</strong> Recording must not be used for bullying, blackmail, harassment, or public distribution.</p>
-        <p><strong>7. Spam is prohibited.</strong> Mass messaging, intrusive advertising, repeated messages, link abuse, and other actions that interfere with normal communication are not allowed.</p>
-        <p><strong>8. Do not impersonate another person.</strong> Do not deliberately present yourself as another user, public figure, or organization representative in order to mislead others.</p>
-        <p><strong>9. Do not distribute personal data.</strong> Do not publish other people’s personal information or request passwords, home addresses, phone numbers, documents, bank card details, or other sensitive information.</p>
-        <p><strong>10. Extremism, hate propaganda, and glorification of criminal ideologies are prohibited.</strong> Calls for violence, terrorism propaganda, Nazism and other hateful ideologies, incitement to hatred or hostility, and support or glorification of such actions, organizations, or ideologies are not allowed.</p>
-        <p><strong>11. Dangerous and illegal behavior is prohibited.</strong> IceChat must not be used to threaten harm, involve others in dangerous activities, or commit or organize illegal activity.</p>
-        <p><strong>12. Do not disrupt the service.</strong> Hacking attempts, bypassing technical restrictions or bans, automated spam, server attacks, and other actions intended to disrupt IceChat are prohibited.</p>
-        <p><strong>13. Use reports appropriately.</strong> Do not submit knowingly false, mass, or abusive reports.</p>
-        <p><strong>14. A report does not automatically result in a ban.</strong> Each report is reviewed by moderation based on context, circumstances, and the nature of the violation. A warning or access restriction may be applied after review.</p>
-        <p><strong>15. Ban duration is determined by moderation.</strong> The duration of a restriction depends on the severity of the violation, its consequences, repetition, and other circumstances.</p>
-        <p><strong>16. A ban may be temporary or permanent.</strong> Depending on the situation, different access restriction periods may be applied, including permanent bans.</p>
-        <p><strong>17. Do not attempt to bypass a ban.</strong> Creating new accounts or using other methods to bypass restrictions may result in additional measures by the administration.</p>
-        <p><strong>18. The administration may restrict access for serious violations.</strong> In cases of serious rule violations, a user may be restricted or banned without prior warning.</p>
-        <p><strong>19. IceChat cannot control every stranger’s behavior in advance.</strong> Because the service uses random matching, you may encounter a user who violates the rules. In that case, end the conversation, press <strong>STOP</strong>, and use the report function.</p>
-        <p><strong>20. Users are responsible for their own actions.</strong> The IceChat administration does not approve or support violations committed by users of the service.</p>
-        <p><strong>21. The rules may change.</strong> The administration may update these rules, clarify individual provisions, and introduce additional restrictions to ensure the safety and normal operation of IceChat.</p>
-        <p><strong>22. Using the service for fraud is prohibited.</strong> Do not deceive users in order to obtain money, account access, verification codes, personal data, or other benefits.</p>
-        <p><strong>23. Do not impersonate IceChat administration.</strong> Do not claim to be an IceChat employee, moderator, or official representative without proper authorization.</p>
-        <p><strong>24. Constant service availability is not guaranteed.</strong> IceChat may be temporarily unavailable due to maintenance, updates, outages, or other circumstances.</p>
-        <p><strong>25. Users may end a conversation at any time.</strong> If a conversation makes you uncomfortable, end it with the <strong>STOP</strong> button or move to the next stranger.</p>
-        <p><strong>26. Do not use IceChat to aggressively collect contact information.</strong> Do not repeatedly or intrusively demand phone numbers, social media accounts, or other contact details from users.</p>
-        <p><strong>27. The administration may take measures to ensure service safety.</strong> When there are grounds to do so, the administration may restrict user access and take reasonable measures to prevent violations and keep IceChat safe.</p>
-
-        <p class="rules-gate-note">By pressing “Continue”, you confirm that you are 18 or older, have read the IceChat rules, and agree to follow them.</p>
-    `;
-
-    function tr(value) {
-        if (currentLanguage === "ru") return value;
-        return translations[value] || value;
+app.get(
+    "/",
+    function (
+        req,
+        res
+    ) {
+        return res.sendFile(
+            path.join(
+                __dirname,
+                "index.html"
+            )
+        );
     }
+);
 
-    function setText(selector, value) {
-        var el = document.querySelector(selector);
-        if (el) el.textContent = currentLanguage === "ru" ? value : tr(value);
+/* =========================
+   STATUS
+   ========================= */
+
+app.get(
+    "/api/match/status",
+    function (
+        req,
+        res
+    ) {
+        return res.json({
+            waiting:
+                waitingUsers.size,
+
+            matches:
+                matches.size,
+
+            rooms:
+                matchRooms.size,
+
+            livekitRooms:
+                liveKitParticipants.size
+        });
     }
+);
 
-    function toRussian(value, fallback) {
-        if (!value) return fallback;
-        if (translations[value]) return value;
-        for (var key in translations) {
-            if (translations[key] === value) return key;
+/* =========================
+   CLEANUP WAITING USERS
+   ========================= */
+
+setInterval(
+    function () {
+        const now =
+            Date.now();
+
+        const MAX_WAIT =
+            2 *
+            60 *
+            1000;
+
+        for (
+            const [
+                socketId,
+                user
+            ]
+                of waitingUsers
+        ) {
+            if (
+                !user.createdAt ||
+                now -
+                    user.createdAt >
+                    MAX_WAIT
+            ) {
+                waitingUsers.delete(
+                    socketId
+                );
+
+                matches.delete(
+                    socketId
+                );
+
+                socketOwners.delete(
+                    socketId
+                );
+
+                /*
+                 * Поиск закончился таймаутом.
+                 */
+                incrementSearchTimedOut();
+            }
         }
-        return fallback || value;
-    }
+    },
+    30 * 1000
+);
 
-    function setLanguage(lang) {
-        var statusDisplayed = document.getElementById("status")
-            ? document.getElementById("status").textContent.trim()
-            : "Готов к поиску";
-        var chatStatusDisplayed = document.getElementById("chatStatus")
-            ? document.getElementById("chatStatus").textContent.trim()
-            : "Нет соединения";
-        var previousStatus = toRussian(statusDisplayed, "Готов к поиску");
-        var previousChatStatus = toRussian(chatStatusDisplayed, "Нет соединения");
+/* =========================
+   CLEANUP LIVEKIT TRACKING
+   ========================= */
 
-        currentLanguage = lang === "en" ? "en" : "ru";
-        localStorage.setItem("icechat_language", currentLanguage);
-        document.documentElement.lang = currentLanguage;
-        document.title = currentLanguage === "en"
-            ? "IceChat — 1-on-1 Video Chat Roulette"
-            : "IceChat — видеочат-рулетка 1 на 1";
+setInterval(
+    function () {
+        for (
+            const [
+                roomName
+            ]
+                of liveKitParticipants
+        ) {
+            if (
+                !matchRooms.has(
+                    roomName
+                )
+            ) {
+                liveKitParticipants.delete(
+                    roomName
+                );
+            }
+        }
+    },
+    60 * 1000
+);
 
-        languageButton.textContent = currentLanguage === "ru" ? "EN" : "RU";
-        languageButton.setAttribute(
-            "aria-label",
-            currentLanguage === "ru" ? "Switch to English" : "Переключить на русский"
+/* =========================
+   ADMIN SESSION CLEANUP
+   ========================= */
+
+setInterval(
+    function () {
+        const now =
+            Date.now();
+
+        const MAX_SESSION =
+            12 *
+            60 *
+            60 *
+            1000;
+
+        for (
+            const [
+                sessionId,
+                session
+            ]
+                of adminSessions
+        ) {
+            if (
+                !session.createdAt ||
+                now -
+                    session.createdAt >
+                    MAX_SESSION
+            ) {
+                adminSessions.delete(
+                    sessionId
+                );
+            }
+        }
+    },
+    30 * 60 * 1000
+);
+
+/* =========================
+   ERROR HANDLER
+   ========================= */
+
+app.use(
+    function (
+        err,
+        req,
+        res,
+        next
+    ) {
+        console.error(
+            "Express error:",
+            err
         );
 
-        var statusEl = document.getElementById("status");
-        if (statusEl) statusEl.textContent = currentLanguage === "ru" ? previousStatus : (translations[previousStatus] || previousStatus);
-        setText(".donation-button", "💎 Поддержать Ice Chat");
-        setText("#rulesOpenButton", "Правила");
-        setText(".setup-block:nth-child(1) .setup-title", "Ваш пол");
-        setText(".setup-block:nth-child(2) .setup-title", "Искать собеседника");
-
-        var myGender = document.querySelectorAll("[data-my-gender]");
-        myGender.forEach(function (el) {
-            var value = el.getAttribute("data-my-gender");
-            el.innerHTML = value === "male"
-                ? '<span class="gender-symbol male">♂</span> ' + (currentLanguage === "ru" ? "Мужчина" : "Male")
-                : '<span class="gender-symbol female">♀</span> ' + (currentLanguage === "ru" ? "Женщина" : "Female");
-        });
-
-        var searchGender = document.querySelectorAll("[data-search-gender]");
-        searchGender.forEach(function (el) {
-            var value = el.getAttribute("data-search-gender");
-            if (value === "male") {
-                el.innerHTML = '<span class="gender-symbol male">♂</span> ' + (currentLanguage === "ru" ? "Мужчина" : "Male");
-            }
-            if (value === "female") {
-                el.innerHTML = '<span class="gender-symbol female">♀</span> ' + (currentLanguage === "ru" ? "Женщина" : "Female");
-            }
-            if (value === "any") el.textContent = currentLanguage === "ru" ? "Оба" : "Both";
-        });
-
-        setText("#remotePlaceholder > div > div:last-child", "Найдите собеседника");
-        setText(".video-card .video-label", "Собеседник");
-        setText(".video-card.small .video-label", "Вы");
-        setText(".chat-title", "💬 Чат");
-        var chatStatusEl = document.getElementById("chatStatus");
-        if (chatStatusEl) chatStatusEl.textContent = currentLanguage === "ru" ? previousChatStatus : (translations[previousChatStatus] || previousChatStatus);
-        setText("#chatEmpty", "Здесь появятся сообщения");
-        setText("#chatInput", "Напишите сообщение...");
-        var input = document.getElementById("chatInput");
-        if (input) input.placeholder = currentLanguage === "ru" ? "Напишите сообщение..." : "Write a message...";
-        setText("#chatSend", "Отправить");
-        setText("#joinButton", "🔎 Найти собеседника");
-        setText("#leaveButton", "⛔ STOP");
-        setText("#micButton", "🎤 Микрофон");
-        setText("#cameraButton", "📷 Камера");
-        setText("#cameraSwitchButton", "🔄 Камера");
-        setText("#reportButton", "🚩 Пожаловаться");
-
-        setText(".rules-title", "📋 Правила IceChat");
-        setText(".rules-subtitle", "Ознакомьтесь с правилами перед входом в видеочат. IceChat доступен только пользователям 18+.");
-        setText(".rules-check span", "Я ознакомился с правилами и мне исполнилось 18 лет.");
-        setText("#rulesContinue", "Продолжить");
-
-        setText(".ban-title", "Доступ заблокирован");
-        setText(".ban-subtitle", "Вы не можете пользоваться поиском собеседников до окончания блокировки.");
-        document.querySelectorAll(".ban-label").forEach(function (el) {
-            var ru = el.getAttribute("data-ru-label") || el.textContent.trim();
-            if (!el.getAttribute("data-ru-label")) el.setAttribute("data-ru-label", ru);
-            el.textContent = currentLanguage === "ru" ? ru : tr(ru);
-        });
-        setText("#banClose", "Понятно");
-
-        setText(".report-title", "🚩 Пожаловаться");
-        setText(".report-subtitle", "Выберите причину жалобы");
-        document.querySelectorAll(".report-reason").forEach(function (el) {
-            var ru = el.getAttribute("data-reason") || el.textContent.trim();
-            el.textContent = currentLanguage === "ru" ? ru : (reportMap[ru] || ru);
-        });
-        var details = document.getElementById("reportDetails");
-        if (details) details.placeholder = currentLanguage === "ru" ? "Дополнительная информация (необязательно)" : "Additional information (optional)";
-        setText("#reportCancel", "Отмена");
-        setText("#reportSubmit", "Отправить жалобу");
-
-        var remoteGender = document.getElementById("remoteGender");
-        if (remoteGender) {
-            var rg = remoteGender.textContent.trim();
-            if (rg === "♂ Мужчина" || rg === "♂ Male") remoteGender.textContent = "♂ " + (currentLanguage === "ru" ? "Мужчина" : "Male");
-            else if (rg === "♀ Женщина" || rg === "♀ Female") remoteGender.textContent = "♀ " + (currentLanguage === "ru" ? "Женщина" : "Female");
-            else remoteGender.textContent = currentLanguage === "ru" ? "👤 Собеседник" : "👤 Stranger";
+        if (
+            res.headersSent
+        ) {
+            return next(
+                err
+            );
         }
 
-        if (rulesContent) rulesContent.innerHTML = currentLanguage === "ru" ? rulesRuHTML : englishRules;
-    }
-
-    function translateDynamic(el) {
-        if (!el || currentLanguage !== "en") return;
-        var value = el.textContent.trim();
-        if (translations[value]) el.textContent = translations[value];
-        if (value === "♂ Мужчина") el.textContent = "♂ Male";
-        if (value === "♀ Женщина") el.textContent = "♀ Female";
-        if (value === "👤 Собеседник") el.textContent = "👤 Stranger";
-        if (value === "Навсегда") el.textContent = "Permanent";
-        if (/^\\d+ д\\. /.test(value)) el.textContent = value.replace(/ д\\. /, " d. ").replace(/ ч\\./, " h.");
-        else if (/^\\d+ ч\\. /.test(value)) el.textContent = value.replace(/ ч\\. /, " h. ").replace(/ мин\\./, " min.");
-        else if (/^\\d+ мин\\. /.test(value)) el.textContent = value.replace(/ мин\\. /, " min. ").replace(/ сек\\./, " sec.");
-        else if (/^\\d+ сек\\.$/.test(value)) el.textContent = value.replace(" сек.", " sec.");
-    }
-
-    var observedSelectors = [
-        "#status", "#chatStatus", "#joinButton", "#leaveButton", "#micButton",
-        "#cameraButton", "#cameraSwitchButton", "#reportButton", "#reportSubmit",
-        "#remoteGender", "#banReason", "#banDuration", "#banUntil"
-    ];
-
-    var observer = new MutationObserver(function () {
-        if (currentLanguage !== "en") return;
-        observedSelectors.forEach(function (selector) {
-            var el = document.querySelector(selector);
-            if (el) translateDynamic(el);
+        return res.status(500).json({
+            error:
+                "Internal server error"
         });
-    });
+    }
+);
 
-    observedSelectors.forEach(function (selector) {
-        var el = document.querySelector(selector);
-        if (el) observer.observe(el, { childList: true, characterData: true, subtree: true });
-    });
+/* =========================
+   SERVER
+   ========================= */
 
-    languageButton.addEventListener("click", function () {
-        setLanguage(currentLanguage === "ru" ? "en" : "ru");
-    });
+server.listen(
+    PORT,
+    "0.0.0.0",
+    function () {
+        console.log(
+            `IceChat запущен на порту ${PORT}`
+        );
 
-    setLanguage(currentLanguage);
-})();
-</script>
+        /*
+         * Создаём stats.json сразу
+         * при запуске, если его нет.
+         */
+        readStats();
 
-</body>
-</html>
+        if (!ADMIN_PASSWORD) {
+            console.warn(
+                "ВНИМАНИЕ: ADMIN_PASSWORD не задан в Render Environment Variables"
+            );
+        }
+
+        if (
+            liveKitRoomService
+        ) {
+            console.log(
+                "LiveKit moderation: ON"
+            );
+        } else {
+            console.warn(
+                "ВНИМАНИЕ: LiveKit moderation OFF — проверь LIVEKIT_URL/API KEY/SECRET"
+            );
+        }
+
+        console.log(
+            "Матчинг: userId + socketId"
+        );
+
+        console.log(
+            "Баны: 1м / 1д / 3д / 7д / 30д / навсегда"
+        );
+
+        console.log(
+            "Статистика: ON"
+        );
+    }
+);
