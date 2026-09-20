@@ -1,0 +1,6117 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    >
+
+    <title>IceChat — видеочат-рулетка 1 на 1</title>
+    <link rel="icon" type="image/png" href="/icechat-logo.png">
+
+<meta name="description" content="IceChat — бесплатная видеочат-рулетка 1 на 1. Общайтесь со случайными собеседниками и выбирайте пол собеседника.">
+
+<meta name="keywords" content="видеочат рулетка, чат рулетка, видеочат, видеочат 1 на 1, видеочат с выбором пола, IceChat">
+
+<meta name="robots" content="index, follow">
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            min-height: 100%;
+            font-family: Arial, Helvetica, sans-serif;
+
+            background:
+                radial-gradient(
+                    circle at top,
+                    #203b59 0%,
+                    #0c1724 45%,
+                    #060b12 100%
+                );
+
+            color: #fff;
+        }
+
+        body {
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        button,
+        input,
+        textarea {
+            font: inherit;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .app {
+            width: 100%;
+            min-height: 100vh;
+        }
+
+        /* =========================
+           HEADER
+           ========================= */
+
+        .header {
+            width: 100%;
+            height: 74px;
+            padding: 0 28px;
+
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            gap: 14px;
+
+            border-bottom:
+                1px solid rgba(255,255,255,0.08);
+
+            background:
+                rgba(10,20,32,0.72);
+
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+        }
+
+        .logo {
+            font-size: 27px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+        }
+
+        .header-right {
+            min-width: 0;
+
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+
+            gap: 8px;
+        }
+
+        .status {
+            max-width: 50%;
+
+            padding: 10px 15px;
+
+            border-radius: 999px;
+
+            background:
+                rgba(255,255,255,0.07);
+
+            border:
+                1px solid rgba(255,255,255,0.09);
+
+            color: #cdeaff;
+            font-size: 14px;
+
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .rules-open-button {
+            flex: 0 0 auto;
+
+            min-height: 40px;
+
+            padding: 0 14px;
+
+            border-radius: 12px;
+
+            border:
+                1px solid rgba(255,255,255,0.1);
+
+            background:
+                rgba(255,255,255,0.06);
+
+            color: #d8ecff;
+
+            cursor: pointer;
+
+            transition:
+                background 0.15s ease,
+                transform 0.15s ease;
+        }
+
+        .rules-open-button:hover {
+            background:
+                rgba(255,255,255,0.11);
+
+            transform:
+                translateY(-1px);
+        }
+
+        .rules-open-button:active {
+            transform:
+                scale(0.98);
+        }
+
+        /* =========================
+           MAIN
+           ========================= */
+
+        .main {
+            width:
+                min(
+                    1180px,
+                    calc(100% - 30px)
+                );
+
+            margin:
+                28px auto 40px;
+        }
+
+        /* =========================
+           SETUP
+           ========================= */
+
+        .setup {
+            display: grid;
+
+            grid-template-columns:
+                1fr 1fr;
+
+            gap: 18px;
+
+            margin-bottom: 22px;
+        }
+
+        .setup-block {
+            min-width: 0;
+
+            padding: 20px;
+
+            border:
+                1px solid rgba(255,255,255,0.09);
+
+            border-radius: 22px;
+
+            background:
+                rgba(255,255,255,0.055);
+
+            box-shadow:
+                0 18px 50px
+                rgba(0,0,0,0.22);
+
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+        }
+
+        .setup-title {
+            margin-bottom: 13px;
+
+            font-size: 14px;
+            color: #a9c4df;
+            font-weight: 700;
+        }
+
+        .choice-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .choice-button {
+            position: relative;
+            z-index: 20;
+
+            min-height: 46px;
+            padding: 0 18px;
+
+            border:
+                1px solid rgba(255,255,255,0.13);
+
+            border-radius: 14px;
+
+            background:
+                rgba(255,255,255,0.065);
+
+            color: #e9f5ff;
+
+            cursor: pointer;
+
+            transition:
+                transform 0.15s ease,
+                background 0.15s ease,
+                border-color 0.15s ease,
+                box-shadow 0.15s ease;
+        }
+
+        .choice-button:hover {
+            background:
+                rgba(255,255,255,0.11);
+
+            transform:
+                translateY(-1px);
+        }
+
+        .choice-button:active {
+            transform:
+                scale(0.98);
+        }
+
+        .choice-button.selected {
+            background:
+                rgba(82,174,255,0.25);
+
+            border-color:
+                rgba(102,195,255,0.95);
+
+            box-shadow:
+                0 0 0 2px
+                rgba(73,171,255,0.24),
+
+                0 8px 25px
+                rgba(30,130,220,0.2);
+
+            color: #fff;
+        }
+
+        /* =========================
+           VIDEOS
+           ========================= */
+
+        .videos {
+            position: relative;
+
+            display: grid;
+
+            grid-template-columns:
+                minmax(0, 1fr) 300px;
+
+            gap: 18px;
+
+            align-items: stretch;
+        }
+
+        .video-card {
+            position: relative;
+
+            min-width: 0;
+            height: 540px;
+
+            overflow: hidden;
+
+            border-radius: 24px;
+
+            border:
+                1px solid rgba(255,255,255,0.1);
+
+            background: #050a10;
+
+            box-shadow:
+                0 25px 70px
+                rgba(0,0,0,0.35);
+        }
+
+        .video-card.small {
+            height: 540px;
+        }
+
+        .video-card video {
+            position: absolute;
+
+            inset: 0;
+
+            z-index: 1;
+
+            width: 100%;
+            height: 100%;
+
+            object-fit: cover;
+
+            background: #050a10;
+        }
+
+        .video-placeholder {
+            position: absolute;
+
+            inset: 0;
+
+            z-index: 3;
+
+            display: flex;
+
+            align-items: center;
+            justify-content: center;
+
+            text-align: center;
+
+            color: #91abc2;
+
+            background:
+                radial-gradient(
+                    circle at center,
+                    rgba(56,107,150,0.16),
+                    rgba(4,10,17,0.95)
+                );
+
+            pointer-events: none;
+        }
+
+        .placeholder-icon {
+            margin-bottom: 12px;
+            font-size: 52px;
+            opacity: 0.75;
+        }
+
+        .person-info {
+            position: absolute;
+
+            z-index: 6;
+
+            left: 16px;
+            top: 16px;
+
+            display: flex;
+
+            align-items: center;
+
+            gap: 7px;
+
+            max-width:
+                calc(100% - 32px);
+
+            padding: 9px 13px;
+
+            border-radius: 999px;
+
+            background:
+                rgba(3,8,14,0.7);
+
+            border:
+                1px solid rgba(255,255,255,0.1);
+
+            color: #fff;
+
+            font-size: 13px;
+
+            pointer-events: none;
+
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .person-info.hidden {
+            display: none;
+        }
+
+        .video-label {
+            position: absolute;
+
+            z-index: 6;
+
+            left: 15px;
+            bottom: 15px;
+
+            padding: 8px 12px;
+
+            border-radius: 999px;
+
+            background:
+                rgba(3,8,14,0.72);
+
+            border:
+                1px solid rgba(255,255,255,0.09);
+
+            color: #fff;
+
+            font-size: 13px;
+
+            pointer-events: none;
+        }
+
+        /* =========================
+           CHAT
+           ========================= */
+
+        .chat-panel {
+            margin-top: 18px;
+            padding: 18px;
+
+            border:
+                1px solid rgba(255,255,255,0.09);
+
+            border-radius: 22px;
+
+            background:
+                rgba(255,255,255,0.055);
+
+            box-shadow:
+                0 18px 50px
+                rgba(0,0,0,0.22);
+
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+        }
+
+        .chat-panel.chat-hidden {
+            display: none;
+        }
+
+        .chat-header {
+            display: flex;
+
+            align-items: center;
+            justify-content: space-between;
+
+            gap: 10px;
+
+            margin-bottom: 12px;
+        }
+
+        .chat-title {
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .chat-status {
+            min-width: 0;
+
+            color: #91abc2;
+            font-size: 12px;
+
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .chat-messages {
+            width: 100%;
+            height: 220px;
+
+            padding: 12px;
+
+            overflow-y: auto;
+            overflow-x: hidden;
+
+            border-radius: 16px;
+
+            border:
+                1px solid rgba(255,255,255,0.08);
+
+            background:
+                rgba(2,7,13,0.52);
+
+            display: flex;
+
+            flex-direction: column;
+
+            gap: 8px;
+
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling:
+                touch;
+        }
+
+        .chat-empty {
+            margin: auto;
+
+            text-align: center;
+
+            color: #71889f;
+            font-size: 13px;
+        }
+
+        .chat-message {
+            max-width: 78%;
+
+            padding: 9px 12px;
+
+            border-radius: 14px;
+
+            font-size: 14px;
+            line-height: 1.35;
+
+            word-break: break-word;
+            overflow-wrap: anywhere;
+
+            white-space: pre-wrap;
+        }
+
+        .chat-message.mine {
+            align-self: flex-end;
+
+            background:
+                rgba(62,169,255,0.22);
+
+            border:
+                1px solid rgba(92,189,255,0.25);
+
+            border-bottom-right-radius: 5px;
+        }
+
+        .chat-message.theirs {
+            align-self: flex-start;
+
+            background:
+                rgba(255,255,255,0.08);
+
+            border:
+                1px solid rgba(255,255,255,0.08);
+
+            border-bottom-left-radius: 5px;
+        }
+
+        .chat-form {
+            display: flex;
+
+            gap: 10px;
+
+            margin-top: 10px;
+        }
+
+        .chat-input {
+            min-width: 0;
+            flex: 1;
+
+            height: 48px;
+
+            padding: 0 15px;
+
+            border-radius: 14px;
+
+            border:
+                1px solid rgba(255,255,255,0.1);
+
+            background:
+                rgba(0,0,0,0.25);
+
+            color: #fff;
+
+            outline: none;
+        }
+
+        .chat-input::placeholder {
+            color: #71889f;
+        }
+
+        .chat-input:focus {
+            border-color:
+                rgba(92,189,255,0.65);
+
+            box-shadow:
+                0 0 0 2px
+                rgba(73,171,255,0.12);
+        }
+
+        .chat-input:disabled {
+            opacity: 0.45;
+        }
+
+        .chat-send {
+            min-width: 110px;
+            height: 48px;
+
+            padding: 0 18px;
+
+            border-radius: 14px;
+
+            border:
+                1px solid rgba(92,189,255,0.45);
+
+            background:
+                rgba(62,169,255,0.2);
+
+            color: #fff;
+
+            cursor: pointer;
+
+            transition:
+                background 0.15s ease,
+                transform 0.15s ease,
+                opacity 0.15s ease;
+        }
+
+        .chat-send:hover:not(:disabled) {
+            background:
+                rgba(62,169,255,0.3);
+
+            transform:
+                translateY(-1px);
+        }
+
+        .chat-send:active:not(:disabled) {
+            transform:
+                scale(0.98);
+        }
+
+        .chat-send:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* =========================
+           CONTROLS
+           ========================= */
+
+        .controls {
+            margin-top: 18px;
+
+            display: flex;
+            flex-wrap: wrap;
+
+            gap: 10px;
+        }
+
+        .controls button {
+            position: relative;
+            z-index: 20;
+
+            min-height: 48px;
+
+            padding: 0 18px;
+
+            border-radius: 14px;
+
+            border:
+                1px solid rgba(255,255,255,0.1);
+
+            background:
+                rgba(255,255,255,0.07);
+
+            color: #fff;
+
+            cursor: pointer;
+
+            transition:
+                background 0.15s ease,
+                transform 0.15s ease,
+                opacity 0.15s ease;
+        }
+
+        .controls button:hover:not(:disabled) {
+            background:
+                rgba(255,255,255,0.12);
+
+            transform:
+                translateY(-1px);
+        }
+
+        .controls button:active:not(:disabled) {
+            transform:
+                scale(0.98);
+        }
+
+        .controls button:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .primary-button {
+            flex: 1 1 260px;
+
+            background:
+                rgba(62,169,255,0.24) !important;
+
+            border-color:
+                rgba(92,189,255,0.72) !important;
+        }
+
+        .stop-button {
+            background:
+                rgba(255,76,76,0.13) !important;
+
+            border-color:
+                rgba(255,100,100,0.35) !important;
+        }
+
+        .camera-switch-button {
+            background:
+                rgba(151,117,255,0.15) !important;
+
+            border-color:
+                rgba(163,134,255,0.4) !important;
+        }
+
+        .report-button {
+            background:
+                rgba(255,80,80,0.13) !important;
+
+            border-color:
+                rgba(255,105,105,0.38) !important;
+        }
+
+        .timer {
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+
+        /* =========================
+           DONATION BUTTON
+           ========================= */
+
+        .donation-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 40px;
+            padding: 0 14px;
+            border-radius: 12px;
+            border: 1px solid rgba(92,189,255,0.38);
+            background: linear-gradient(
+                135deg,
+                rgba(62,169,255,0.16),
+                rgba(151,117,255,0.14)
+            );
+            color: #eaf7ff;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 700;
+            white-space: nowrap;
+            box-shadow: 0 6px 22px rgba(30,130,220,0.10);
+            transition:
+                background 0.15s ease,
+                border-color 0.15s ease,
+                transform 0.15s ease,
+                box-shadow 0.15s ease;
+        }
+
+        .donation-button:hover {
+            background: linear-gradient(
+                135deg,
+                rgba(62,169,255,0.28),
+                rgba(151,117,255,0.24)
+            );
+            border-color: rgba(102,195,255,0.72);
+            transform: translateY(-1px);
+            box-shadow: 0 8px 28px rgba(30,130,220,0.20);
+        }
+
+        .donation-button:active {
+            transform: scale(0.98);
+        }
+
+        /* =========================
+           RULES MODAL
+           ========================= */
+
+        .rules-modal {
+            position: fixed;
+
+            inset: 0;
+
+            z-index: 2000;
+
+            display: flex;
+
+            align-items: center;
+            justify-content: center;
+
+            padding: 16px;
+
+            background:
+                rgba(0,0,0,0.78);
+
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        .rules-modal.hidden {
+            display: none;
+        }
+
+        .rules-box {
+            width:
+                min(
+                    760px,
+                    100%
+                );
+
+            max-height:
+                calc(100vh - 32px);
+
+            display: flex;
+
+            flex-direction: column;
+
+            border-radius: 24px;
+
+            border:
+                1px solid rgba(255,255,255,0.12);
+
+            background:
+                rgba(11,21,33,0.98);
+
+            box-shadow:
+                0 35px 120px
+                rgba(0,0,0,0.62);
+
+            overflow: hidden;
+        }
+
+        .rules-header {
+            flex: 0 0 auto;
+
+            padding:
+                22px 24px 15px;
+
+            border-bottom:
+                1px solid rgba(255,255,255,0.08);
+        }
+
+        .rules-title {
+            font-size: 24px;
+            font-weight: 800;
+        }
+
+        .rules-subtitle {
+            margin-top: 6px;
+
+            color: #91abc2;
+
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .rules-content {
+            flex: 1;
+
+            min-height: 0;
+
+            padding:
+                20px 24px;
+
+            overflow-y: auto;
+
+            -webkit-overflow-scrolling:
+                touch;
+        }
+
+        .rules-content h3 {
+            margin:
+                0 0 7px;
+
+            font-size: 15px;
+        }
+
+        .rules-content p {
+            margin:
+                0 0 16px;
+
+            color: #c5d5e4;
+
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .rules-footer {
+            flex: 0 0 auto;
+
+            padding:
+                16px 24px 20px;
+
+            border-top:
+                1px solid rgba(255,255,255,0.08);
+
+            background:
+                rgba(255,255,255,0.025);
+        }
+
+        .rules-check {
+            display: flex;
+
+            align-items: flex-start;
+
+            gap: 10px;
+
+            margin-bottom: 14px;
+
+            color: #d9e7f4;
+
+            font-size: 13px;
+            line-height: 1.4;
+
+            cursor: pointer;
+        }
+
+        .rules-check input {
+            flex:
+                0 0 auto;
+
+            width: 18px;
+            height: 18px;
+
+            margin-top: 1px;
+
+            accent-color: #52aeff;
+
+            cursor: pointer;
+        }
+
+        .rules-continue {
+            width: 100%;
+
+            min-height: 50px;
+
+            border-radius: 14px;
+
+            border:
+                1px solid rgba(92,189,255,0.72);
+
+            background:
+                rgba(62,169,255,0.24);
+
+            color: #fff;
+
+            font-weight: 700;
+
+            cursor: pointer;
+
+            transition:
+                background 0.15s ease,
+                transform 0.15s ease,
+                opacity 0.15s ease;
+        }
+
+        .rules-continue:hover:not(:disabled) {
+            background:
+                rgba(62,169,255,0.34);
+
+            transform:
+                translateY(-1px);
+        }
+
+        .rules-continue:active:not(:disabled) {
+            transform:
+                scale(0.98);
+        }
+
+        .rules-continue:disabled {
+            opacity: 0.4;
+
+            cursor: not-allowed;
+
+            transform: none;
+        }
+
+        /* =========================
+           FIRST-ENTRY RULES GATE
+           ========================= */
+        .rules-modal.entry-gate {
+            z-index: 3000;
+        }
+
+        .rules-gate-note {
+            margin-top: 10px;
+            color: #91abc2;
+            font-size: 11px;
+            line-height: 1.45;
+        }
+
+        /* =========================
+           BAN MODAL
+           ========================= */
+
+        .ban-modal {
+            position: fixed;
+
+            inset: 0;
+
+            z-index: 1200;
+
+            display: flex;
+
+            align-items: center;
+            justify-content: center;
+
+            padding: 16px;
+
+            background:
+                rgba(0,0,0,0.72);
+
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .ban-modal.hidden {
+            display: none;
+        }
+
+        .ban-box {
+            width:
+                min(
+                    460px,
+                    100%
+                );
+
+            padding: 24px;
+
+            border-radius: 22px;
+
+            border:
+                1px solid
+                rgba(255,100,100,0.25);
+
+            background:
+                rgba(14,23,35,0.98);
+
+            box-shadow:
+                0 30px 100px
+                rgba(0,0,0,0.55);
+        }
+
+        .ban-icon {
+            margin-bottom: 10px;
+
+            font-size: 46px;
+
+            text-align: center;
+        }
+
+        .ban-title {
+            margin-bottom: 8px;
+
+            font-size: 23px;
+            font-weight: 800;
+
+            text-align: center;
+        }
+
+        .ban-subtitle {
+            margin-bottom: 18px;
+
+            color: #91abc2;
+
+            font-size: 13px;
+            line-height: 1.45;
+
+            text-align: center;
+        }
+
+        .ban-info {
+            display: grid;
+
+            gap: 10px;
+
+            padding: 15px;
+
+            border-radius: 15px;
+
+            background:
+                rgba(255,255,255,0.055);
+
+            border:
+                1px solid
+                rgba(255,255,255,0.08);
+        }
+
+        .ban-row {
+            display: grid;
+
+            gap: 4px;
+        }
+
+        .ban-label {
+            color: #71889f;
+
+            font-size: 11px;
+        }
+
+        .ban-value {
+            color: #fff;
+
+            font-size: 14px;
+
+            line-height: 1.4;
+
+            overflow-wrap: anywhere;
+        }
+
+        .ban-close {
+            width: 100%;
+
+            min-height: 46px;
+
+            margin-top: 14px;
+
+            border-radius: 13px;
+
+            border:
+                1px solid
+                rgba(255,255,255,0.1);
+
+            background:
+                rgba(255,255,255,0.07);
+
+            color: #fff;
+
+            cursor: pointer;
+        }
+
+        .ban-close:hover {
+            background:
+                rgba(255,255,255,0.12);
+        }
+
+        /* =========================
+           REPORT MODAL
+           ========================= */
+
+        .report-modal {
+            position: fixed;
+
+            inset: 0;
+
+            z-index: 1000;
+
+            display: flex;
+
+            align-items: center;
+            justify-content: center;
+
+            padding: 16px;
+
+            background:
+                rgba(0,0,0,0.68);
+
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .report-modal.hidden {
+            display: none;
+        }
+
+        .report-box {
+            width: min(460px, 100%);
+
+            max-height:
+                calc(100vh - 32px);
+
+            overflow-y: auto;
+
+            padding: 22px;
+
+            border-radius: 22px;
+
+            border:
+                1px solid rgba(255,255,255,0.12);
+
+            background:
+                rgba(12,23,36,0.98);
+
+            box-shadow:
+                0 30px 100px
+                rgba(0,0,0,0.5);
+        }
+
+        .report-title {
+            font-size: 20px;
+            font-weight: 800;
+
+            margin-bottom: 6px;
+        }
+
+        .report-subtitle {
+            color: #91abc2;
+            font-size: 13px;
+
+            margin-bottom: 15px;
+        }
+
+        .report-reasons {
+            display: grid;
+            gap: 8px;
+        }
+
+        .report-reason {
+            width: 100%;
+
+            min-height: 44px;
+
+            padding: 10px 12px;
+
+            text-align: left;
+
+            border-radius: 12px;
+
+            border:
+                1px solid rgba(255,255,255,0.1);
+
+            background:
+                rgba(255,255,255,0.06);
+
+            color: #fff;
+
+            cursor: pointer;
+
+            transition:
+                background 0.15s ease,
+                border-color 0.15s ease,
+                transform 0.15s ease;
+        }
+
+        .report-reason:hover {
+            background:
+                rgba(255,255,255,0.1);
+
+            transform:
+                translateY(-1px);
+        }
+
+        .report-reason:active {
+            transform:
+                scale(0.99);
+        }
+
+        .report-reason.selected {
+            background:
+                rgba(255,80,80,0.2);
+
+            border-color:
+                rgba(255,110,110,0.7);
+
+            box-shadow:
+                0 0 0 2px
+                rgba(255,80,80,0.1);
+        }
+
+        .report-details {
+            width: 100%;
+
+            height: 90px;
+
+            margin-top: 12px;
+
+            padding: 11px 12px;
+
+            resize: none;
+
+            border-radius: 12px;
+
+            border:
+                1px solid rgba(255,255,255,0.1);
+
+            background:
+                rgba(0,0,0,0.22);
+
+            color: #fff;
+
+            outline: none;
+        }
+
+        .report-details:focus {
+            border-color:
+                rgba(255,110,110,0.55);
+
+            box-shadow:
+                0 0 0 2px
+                rgba(255,80,80,0.1);
+        }
+
+        .report-details::placeholder {
+            color: #71889f;
+        }
+
+        .report-actions {
+            display: grid;
+
+            grid-template-columns:
+                1fr 1.5fr;
+
+            gap: 8px;
+
+            margin-top: 12px;
+        }
+
+        .report-actions button {
+            min-height: 46px;
+
+            border-radius: 12px;
+
+            cursor: pointer;
+        }
+
+        .report-cancel {
+            border:
+                1px solid rgba(255,255,255,0.1);
+
+            background:
+                rgba(255,255,255,0.06);
+
+            color: #fff;
+        }
+
+        .report-cancel:hover {
+            background:
+                rgba(255,255,255,0.1);
+        }
+
+        .report-submit {
+            border:
+                1px solid rgba(255,100,100,0.5);
+
+            background:
+                rgba(255,70,70,0.2);
+
+            color: #fff;
+        }
+
+        .report-submit:hover:not(:disabled) {
+            background:
+                rgba(255,70,70,0.3);
+        }
+
+        .report-submit:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* =====================================================
+           TABLET
+           ===================================================== */
+
+        @media (max-width: 850px)
+        and (min-width: 521px) {
+
+            .header {
+                height: 64px;
+                padding: 0 16px;
+            }
+
+            .logo {
+                font-size: 23px;
+            }
+
+            .status {
+                max-width: 55%;
+
+                padding: 8px 11px;
+
+                font-size: 12px;
+            }
+
+            .rules-open-button {
+                min-height: 38px;
+
+                padding: 0 10px;
+
+                font-size: 12px;
+            }
+
+            .main {
+                width:
+                    calc(100% - 20px);
+
+                max-width: 700px;
+
+                margin:
+                    12px auto 24px;
+            }
+
+            .setup {
+                grid-template-columns: 1fr;
+
+                gap: 10px;
+
+                margin-bottom: 12px;
+            }
+
+            .setup-block {
+                padding: 14px;
+                border-radius: 18px;
+            }
+
+            .setup-title {
+                margin-bottom: 9px;
+                font-size: 13px;
+            }
+
+            .setup-block:first-child
+            .choice-group {
+
+                display: grid;
+
+                grid-template-columns:
+                    repeat(
+                        2,
+                        minmax(0, 1fr)
+                    );
+
+                gap: 8px;
+            }
+
+            .setup-block:nth-child(2)
+            .choice-group {
+
+                display: grid;
+
+                grid-template-columns:
+                    repeat(
+                        3,
+                        minmax(0, 1fr)
+                    );
+
+                gap: 8px;
+            }
+
+            .choice-button {
+                width: 100%;
+                min-height: 45px;
+
+                padding: 0 8px;
+
+                font-size: 13px;
+            }
+
+            .videos {
+                position: relative;
+
+                display: block;
+
+                width: 100%;
+                height: auto;
+            }
+
+            .videos >
+            .video-card:not(.small) {
+
+                position: relative;
+
+                width: 100%;
+
+                height:
+                    min(
+                        56svh,
+                        500px
+                    );
+
+                min-height: 320px;
+                max-height: 500px;
+            }
+
+            .videos >
+            .video-card.small {
+
+                position: absolute !important;
+
+                top: 10px !important;
+                right: 10px !important;
+
+                width: 100px !important;
+                height: 105px !important;
+
+                min-width: 100px !important;
+                min-height: 105px !important;
+
+                max-width: 100px !important;
+                max-height: 105px !important;
+
+                z-index: 50 !important;
+
+                border-radius: 14px;
+
+                border:
+                    2px solid
+                    rgba(255,255,255,0.28);
+
+                box-shadow:
+                    0 10px 30px
+                    rgba(0,0,0,0.5);
+            }
+
+            .videos >
+            .video-card.small video {
+
+                width: 100% !important;
+                height: 100% !important;
+
+                object-fit: cover !important;
+            }
+
+            .person-info {
+                left: 10px;
+                top: 10px;
+
+                max-width:
+                    calc(100% - 125px);
+
+                padding: 8px 10px;
+
+                gap: 5px;
+
+                border-radius: 13px;
+
+                font-size: 12px;
+            }
+
+            .video-label {
+                left: 10px;
+                bottom: 10px;
+
+                padding: 7px 10px;
+
+                font-size: 11px;
+            }
+
+            .video-card.small
+            .video-label {
+
+                left: 6px;
+                bottom: 6px;
+
+                padding: 4px 6px;
+
+                font-size: 9px;
+            }
+
+            .chat-panel {
+                margin-top: 12px;
+
+                padding: 13px;
+
+                border-radius: 18px;
+            }
+
+            .chat-messages {
+                height: 180px;
+            }
+
+            .chat-form {
+                display: grid;
+
+                grid-template-columns:
+                    minmax(0, 1fr)
+                    100px;
+
+                gap: 8px;
+            }
+
+            .chat-send {
+                min-width: 0;
+            }
+
+            .controls {
+                display: grid;
+
+                grid-template-columns:
+                    repeat(
+                        3,
+                        minmax(0, 1fr)
+                    );
+
+                gap: 8px;
+
+                margin-top: 12px;
+            }
+
+            .controls button {
+                width: 100%;
+
+                min-height: 50px;
+
+                padding: 0 7px;
+
+                font-size: 13px;
+            }
+
+            .primary-button {
+                grid-column:
+                    1 / -1;
+
+                min-height:
+                    54px !important;
+            }
+
+            .stop-button,
+            .report-button {
+                grid-column:
+                    1 / -1;
+            }
+        }
+
+        /* =====================================================
+           PHONE
+           ===================================================== */
+
+        @media (max-width: 520px) {
+
+            .header {
+                height: 58px;
+                padding: 0 10px;
+            }
+
+            .logo {
+                font-size: 21px;
+            }
+
+            .header-right {
+                gap: 5px;
+            }
+
+            .status {
+                max-width: 45%;
+
+                padding:
+                    7px 9px;
+
+                font-size: 10px;
+            }
+
+
+            .donation-button {
+                min-height: 34px;
+                padding: 0 9px;
+                font-size: 10px;
+                border-radius: 10px;
+            }
+
+            .rules-open-button {
+                min-height: 34px;
+
+                padding:
+                    0 8px;
+
+                font-size: 10px;
+
+                border-radius: 10px;
+            }
+
+            .main {
+                width:
+                    calc(100% - 12px);
+
+                margin:
+                    8px auto 18px;
+            }
+
+            .setup {
+                gap: 7px;
+                margin-bottom: 8px;
+            }
+
+            .setup-block {
+                padding: 10px;
+
+                border-radius: 15px;
+            }
+
+            .setup-title {
+                margin-bottom: 7px;
+                font-size: 12px;
+            }
+
+            .setup-block:first-child
+            .choice-group {
+
+                display: grid;
+
+                grid-template-columns:
+                    repeat(
+                        2,
+                        minmax(0, 1fr)
+                    );
+
+                gap: 6px;
+            }
+
+            .setup-block:nth-child(2)
+            .choice-group {
+
+                display: grid;
+
+                grid-template-columns:
+                    repeat(
+                        3,
+                        minmax(0, 1fr)
+                    );
+
+                gap: 6px;
+            }
+
+            .choice-button {
+                width: 100%;
+
+                min-height: 40px;
+
+                padding: 0 4px;
+
+                font-size: 12px;
+
+                border-radius: 11px;
+            }
+
+            .videos {
+                position: relative !important;
+
+                display: block !important;
+
+                width: 100% !important;
+
+                height: auto !important;
+
+                min-height: 0 !important;
+            }
+
+            .videos >
+            .video-card:not(.small) {
+
+                position: relative !important;
+
+                display: block !important;
+
+                width: 100% !important;
+
+                height: auto !important;
+
+                aspect-ratio:
+                    4 / 3 !important;
+
+                min-height: 0 !important;
+
+                max-height: none !important;
+
+                overflow: hidden !important;
+
+                border-radius: 17px;
+            }
+
+            .videos >
+            .video-card.small {
+
+                position: absolute !important;
+
+                display: block !important;
+
+                top: 8px !important;
+                right: 8px !important;
+
+                left: auto !important;
+                bottom: auto !important;
+
+                width: 86px !important;
+                height: 88px !important;
+
+                min-width: 86px !important;
+                min-height: 88px !important;
+
+                max-width: 86px !important;
+                max-height: 88px !important;
+
+                aspect-ratio: auto !important;
+
+                margin: 0 !important;
+
+                z-index: 100 !important;
+
+                border-radius: 12px !important;
+
+                border:
+                    2px solid
+                    rgba(255,255,255,0.28)
+                    !important;
+
+                box-shadow:
+                    0 8px 24px
+                    rgba(0,0,0,0.55);
+            }
+
+            .videos >
+            .video-card.small video {
+
+                position: absolute !important;
+
+                inset: 0 !important;
+
+                width: 100% !important;
+                height: 100% !important;
+
+                min-width: 0 !important;
+                min-height: 0 !important;
+
+                max-width: none !important;
+                max-height: none !important;
+
+                object-fit: cover !important;
+            }
+
+            .video-card:not(.small)
+            video {
+
+                position: absolute !important;
+
+                inset: 0 !important;
+
+                width: 100% !important;
+                height: 100% !important;
+
+                object-fit: cover !important;
+            }
+
+            .person-info {
+                left: 8px;
+                top: 8px;
+
+                max-width:
+                    calc(100% - 104px);
+
+                padding:
+                    6px 8px;
+
+                gap: 4px;
+
+                border-radius: 10px;
+
+                font-size: 10px;
+
+                overflow: hidden;
+            }
+
+            .person-info span {
+                white-space: nowrap;
+            }
+
+            .video-label {
+                left: 8px;
+                bottom: 8px;
+
+                padding:
+                    6px 8px;
+
+                font-size: 10px;
+            }
+
+            .video-card.small
+            .video-label {
+
+                left: 4px;
+                bottom: 4px;
+
+                padding:
+                    3px 5px;
+
+                font-size: 8px;
+            }
+
+            .placeholder-icon {
+                margin-bottom: 9px;
+                font-size: 36px;
+            }
+
+            .chat-panel {
+                margin-top: 8px;
+
+                padding: 10px;
+
+                border-radius: 15px;
+            }
+
+            .chat-header {
+                margin-bottom: 7px;
+            }
+
+            .chat-title {
+                font-size: 14px;
+            }
+
+            .chat-status {
+                max-width: 145px;
+                font-size: 10px;
+            }
+
+            .chat-messages {
+                height: 165px;
+
+                padding: 8px;
+
+                border-radius: 12px;
+            }
+
+            .chat-message {
+                max-width: 88%;
+
+                padding:
+                    8px 10px;
+
+                font-size: 13px;
+
+                border-radius: 11px;
+            }
+
+            .chat-form {
+                display: grid;
+
+                grid-template-columns:
+                    minmax(0, 1fr)
+                    76px;
+
+                gap: 6px;
+            }
+
+            .chat-input {
+                width: 100%;
+                height: 44px;
+
+                padding:
+                    0 10px;
+
+                font-size: 13px;
+
+                border-radius: 11px;
+            }
+
+            .chat-send {
+                width: 100%;
+
+                min-width: 0;
+
+                height: 44px;
+
+                padding:
+                    0 4px;
+
+                font-size: 12px;
+
+                border-radius: 11px;
+            }
+
+            .controls {
+                display: grid;
+
+                grid-template-columns:
+                    repeat(
+                        3,
+                        minmax(0, 1fr)
+                    );
+
+                gap: 6px;
+
+                margin-top: 8px;
+            }
+
+            .controls button {
+                width: 100%;
+
+                min-height: 46px;
+
+                padding:
+                    0 3px;
+
+                font-size: 11px;
+
+                border-radius: 11px;
+            }
+
+            .primary-button {
+                grid-column:
+                    1 / -1;
+
+                min-height:
+                    49px !important;
+
+                font-size:
+                    13px !important;
+            }
+
+            .stop-button,
+            .report-button {
+                grid-column:
+                    1 / -1;
+            }
+
+            .rules-box {
+                max-height:
+                    calc(100vh - 16px);
+
+                border-radius: 18px;
+            }
+
+            .rules-header {
+                padding:
+                    18px 16px 13px;
+            }
+
+            .rules-title {
+                font-size: 20px;
+            }
+
+            .rules-subtitle {
+                font-size: 11px;
+            }
+
+            .rules-content {
+                padding:
+                    16px;
+            }
+
+            .rules-content h3 {
+                font-size: 14px;
+            }
+
+            .rules-content p {
+                margin-bottom: 14px;
+
+                font-size: 12px;
+                line-height: 1.5;
+            }
+
+            .rules-footer {
+                padding:
+                    13px 16px 16px;
+            }
+
+            .rules-check {
+                font-size: 12px;
+            }
+
+            .rules-continue {
+                min-height: 47px;
+
+                font-size: 13px;
+            }
+
+            .report-box,
+            .ban-box {
+                padding: 16px;
+
+                border-radius: 18px;
+            }
+
+            .report-title,
+            .ban-title {
+                font-size: 18px;
+            }
+
+            .report-subtitle,
+            .ban-subtitle {
+                font-size: 12px;
+            }
+
+            .report-actions {
+                grid-template-columns:
+                    1fr;
+            }
+
+            .report-reason {
+                min-height: 42px;
+                font-size: 12px;
+            }
+
+            .report-details {
+                height: 82px;
+                font-size: 12px;
+            }
+        }
+
+        /* =====================================================
+           VERY SMALL PHONE
+           ===================================================== */
+
+        @media (max-width: 370px) {
+
+            .header {
+                height: 55px;
+            }
+
+            .logo {
+                font-size: 19px;
+            }
+
+            .status {
+                max-width: 38%;
+
+                font-size: 9px;
+            }
+
+
+            .donation-button {
+                padding: 0 6px;
+                font-size: 9px;
+            }
+
+            .rules-open-button {
+                padding: 0 6px;
+                font-size: 9px;
+            }
+
+            .choice-button {
+                min-height: 38px;
+                font-size: 11px;
+            }
+
+            .videos >
+            .video-card:not(.small) {
+                aspect-ratio:
+                    4 / 3 !important;
+            }
+
+            .videos >
+            .video-card.small {
+
+                width: 76px !important;
+                height: 78px !important;
+
+                min-width: 76px !important;
+                min-height: 78px !important;
+
+                max-width: 76px !important;
+                max-height: 78px !important;
+            }
+
+            .person-info {
+                max-width:
+                    calc(100% - 92px);
+
+                font-size: 9px;
+            }
+
+            .chat-messages {
+                height: 145px;
+            }
+
+            .chat-form {
+                grid-template-columns:
+                    minmax(0, 1fr)
+                    66px;
+            }
+
+            .chat-input {
+                font-size: 12px;
+            }
+
+            .chat-send {
+                font-size: 10px;
+            }
+
+            .controls button {
+                min-height: 44px;
+                font-size: 10px;
+            }
+
+            .primary-button {
+                font-size:
+                    12px !important;
+            }
+
+            .report-box,
+            .ban-box {
+                padding: 13px;
+            }
+        }
+    
+        /* =========================
+           LANGUAGE SWITCHER
+           ========================= */
+
+        .language-button {
+            flex: 0 0 auto;
+            min-height: 40px;
+            padding: 9px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,0.10);
+            background: rgba(255,255,255,0.07);
+            color: #fff;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 700;
+            transition: background 0.2s ease, transform 0.2s ease;
+        }
+
+        .gender-symbol {
+            font-family: Arial, Helvetica, sans-serif;
+            font-weight: 800;
+            font-size: 1.05em;
+            display: inline-block;
+            line-height: 1;
+        }
+
+        .gender-symbol.male {
+            color: #4da6ff;
+            text-shadow: 0 0 7px rgba(77,166,255,0.28);
+        }
+
+        .gender-symbol.female {
+            color: #ff69b4;
+            text-shadow: 0 0 7px rgba(255,105,180,0.25);
+        }
+
+        .language-button:hover {
+            background: rgba(255,255,255,0.12);
+        }
+
+        .language-button:active {
+            transform: scale(0.97);
+        }
+
+    </style>
+</head>
+
+<body>
+
+<div class="app">
+
+    <header class="header">
+
+        <div class="logo">
+            IceChat
+        </div>
+
+        <div class="header-right">
+
+            <div
+                id="status"
+                class="status">
+                Готов к поиску
+            </div>
+
+            <a
+                class="donation-button"
+                href="https://www.donationalerts.com/r/icechat"
+                target="_blank"
+                rel="noopener noreferrer">
+                💎 Поддержать Ice Chat
+            </a>
+
+            <button
+                id="rulesOpenButton"
+                type="button"
+                class="rules-open-button">
+                Правила
+            </button>
+
+            <button
+                id="languageButton"
+                type="button"
+                class="language-button"
+                aria-label="Switch language">
+                EN
+            </button>
+
+        </div>
+
+    </header>
+
+    <main class="main">
+
+        <section class="setup">
+
+            <div class="setup-block">
+
+                <div class="setup-title">
+                    Ваш пол
+                </div>
+
+                <div class="choice-group">
+
+                    <button
+                        type="button"
+                        class="choice-button"
+                        data-my-gender="male">
+                        <span class="gender-symbol male">♂</span> Мужчина
+                    </button>
+
+                    <button
+                        type="button"
+                        class="choice-button"
+                        data-my-gender="female">
+                        <span class="gender-symbol female">♀</span> Женщина
+                    </button>
+
+                </div>
+            </div>
+
+            <div class="setup-block">
+
+                <div class="setup-title">
+                    Искать собеседника
+                </div>
+
+                <div class="choice-group">
+
+                    <button
+                        type="button"
+                        class="choice-button"
+                        data-search-gender="male">
+                        <span class="gender-symbol male">♂</span> Мужчина
+                    </button>
+
+                    <button
+                        type="button"
+                        class="choice-button"
+                        data-search-gender="female">
+                        <span class="gender-symbol female">♀</span> Женщина
+                    </button>
+
+                    <button
+                        type="button"
+                        class="choice-button selected"
+                        data-search-gender="any">
+                        Оба
+                    </button>
+
+                </div>
+            </div>
+
+        </section>
+
+        <section class="videos">
+
+            <div class="video-card">
+
+                <video
+                    id="remoteVideo"
+                    autoplay
+                    playsinline>
+                </video>
+
+                <div
+                    id="remotePlaceholder"
+                    class="video-placeholder">
+
+                    <div>
+
+                        <div class="placeholder-icon">
+                            👤
+                        </div>
+
+                        <div>
+                            Найдите собеседника
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div
+                    id="remoteInfo"
+                    class="person-info hidden">
+
+                    <span id="remoteGender">
+                        👤 Собеседник
+                    </span>
+
+                    <span>·</span>
+
+                    <span id="remoteCountry">
+                        🌐 UN
+                    </span>
+
+                    <span>·</span>
+
+                    <span
+                        id="callTimer"
+                        class="timer">
+                        00:00
+                    </span>
+
+                </div>
+
+                <div class="video-label">
+                    Собеседник
+                </div>
+
+            </div>
+
+            <div class="video-card small">
+
+                <video
+                    id="localVideo"
+                    autoplay
+                    muted
+                    playsinline>
+                </video>
+
+                <div class="video-label">
+                    Вы
+                </div>
+
+            </div>
+
+        </section>
+
+        <section class="chat-panel">
+
+            <div class="chat-header">
+
+                <div class="chat-title">
+                    💬 Чат
+                </div>
+
+                <div
+                    id="chatStatus"
+                    class="chat-status">
+                    Нет соединения
+                </div>
+
+            </div>
+
+            <div
+                id="chatMessages"
+                class="chat-messages">
+
+                <div
+                    id="chatEmpty"
+                    class="chat-empty">
+                    Здесь появятся сообщения
+                </div>
+
+            </div>
+
+            <form
+                id="chatForm"
+                class="chat-form">
+
+                <input
+                    id="chatInput"
+                    class="chat-input"
+                    type="text"
+                    maxlength="500"
+                    autocomplete="off"
+                    placeholder="Напишите сообщение..."
+                    disabled
+                >
+
+                <button
+                    id="chatSend"
+                    class="chat-send"
+                    type="submit"
+                    disabled>
+                    Отправить
+                </button>
+
+            </form>
+
+        </section>
+
+        <section class="controls">
+
+            <button
+                id="joinButton"
+                type="button"
+                class="primary-button">
+                🔎 Найти собеседника
+            </button>
+
+            <button
+                id="leaveButton"
+                type="button"
+                class="stop-button"
+                disabled>
+                ⛔ STOP
+            </button>
+
+            <button
+                id="micButton"
+                type="button"
+                disabled>
+                🎤 Микрофон
+            </button>
+
+            <button
+                id="cameraButton"
+                type="button"
+                disabled>
+                📷 Камера
+            </button>
+
+            <button
+                id="cameraSwitchButton"
+                type="button"
+                class="camera-switch-button"
+                disabled>
+                🔄 Камера
+            </button>
+
+            <button
+                id="reportButton"
+                type="button"
+                class="report-button"
+                disabled>
+                🚩 Пожаловаться
+            </button>
+
+            <button
+                id="chatToggleButton"
+                type="button">
+                💬 Текстовый чат
+            </button>
+
+        </section>
+
+    </main>
+
+</div>
+
+<!-- =========================
+     RULES MODAL
+     ========================= -->
+
+<div
+    id="rulesModal"
+    class="rules-modal entry-gate hidden">
+
+    <div class="rules-box">
+
+        <div class="rules-header">
+
+            <div class="rules-title">
+                📋 Правила IceChat
+            </div>
+
+            <div class="rules-subtitle">
+                Ознакомьтесь с правилами перед входом в видеочат. IceChat доступен только пользователям 18+.
+            </div>
+
+        </div>
+
+        <div class="rules-content">
+
+            <h3>Добро пожаловать в IceChat! 👋</h3>
+            <p><strong>IceChat</strong> — случайная видеочат-рулетка, которая позволяет общаться с людьми из разных стран и находить новых собеседников.</p>
+
+            <h3>🧊 Почему IceChat?</h3>
+            <p>Мы хотим сделать случайное общение простым и доступным. Поэтому <strong>выбор пола собеседника в IceChat полностью бесплатный</strong>.</p>
+            <p>В отличие от многих других сервисов, где поиск по полу может быть доступен только за деньги, в <strong>IceChat</strong> эта возможность предоставляется бесплатно, без подписки и дополнительных платежей.</p>
+
+            <h3>📋 Правила IceChat</h3>
+            <p><strong>1. IceChat предназначен только для пользователей в возрасте 18 лет и старше.</strong> Используя сервис и нажимая кнопку «Продолжить», вы подтверждаете, что вам исполнилось 18 лет. Лицам младше 18 лет запрещено использовать IceChat.</p>
+            <p><strong>2. Уважайте собеседников.</strong> Запрещены оскорбления, травля, угрозы, преследование, намеренное унижение и иное агрессивное поведение.</p>
+            <p><strong>3. Запрещён непристойный контент.</strong> Нельзя демонстрировать или распространять сексуальный, порнографический или иной явно неприемлемый контент.</p>
+            <p><strong>4. Запрещено сексуальное поведение с участием несовершеннолетних.</strong> Любые сексуальные действия, предложения или демонстрация сексуального контента несовершеннолетним запрещены.</p>
+            <p><strong>5. Не пытайтесь обходить возрастные ограничения сервиса или предоставлять заведомо недостоверную информацию о возрасте.</strong></p>
+            <p><strong>6. Не записывайте и не распространяйте видео собеседников без их согласия.</strong> Запрещено использовать запись разговора для травли, шантажа, преследования или публичного распространения.</p>
+            <p><strong>7. Запрещён спам.</strong> Не допускаются массовая рассылка сообщений, навязчивая реклама, повторяющиеся сообщения, злоупотребление ссылками и иные действия, мешающие нормальному общению.</p>
+            <p><strong>8. Запрещено выдавать себя за другого человека.</strong> Нельзя намеренно представляться другим пользователем, публичной персоной или представителем организации с целью введения собеседника в заблуждение.</p>
+            <p><strong>9. Не распространяйте персональные данные.</strong> Не публикуйте чужие и не требуйте от собеседников пароли, адреса проживания, номера телефонов, документы, данные банковских карт и другую чувствительную информацию.</p>
+            <p><strong>10. Запрещены экстремизм, пропаганда ненависти и оправдание преступных идеологий.</strong> Не допускаются призывы к насилию, пропаганда терроризма, нацизма и иных человеконенавистнических идеологий, разжигание ненависти или вражды, а также поддержка, популяризация или героизация подобных действий, организаций и идеологий.</p>
+            <p><strong>11. Запрещено опасное и незаконное поведение.</strong> IceChat нельзя использовать для угроз причинения вреда, вовлечения других людей в опасные действия, совершения или организации незаконной деятельности.</p>
+            <p><strong>12. Не нарушайте работу сервиса.</strong> Запрещены попытки взлома, обход технических ограничений и блокировок, автоматизированный спам, атаки на сервер и иные действия, направленные на нарушение работы IceChat.</p>
+            <p><strong>13. Используйте жалобы по назначению.</strong> Не отправляйте заведомо ложные, массовые или направленные на злоупотребление системой жалобы.</p>
+            <p><strong>14. Жалоба не означает автоматический бан.</strong> Каждое обращение рассматривается модерацией с учётом контекста, обстоятельств и характера нарушения. По итогам рассмотрения может быть вынесено предупреждение или применено ограничение доступа.</p>
+            <p><strong>15. Срок блокировки определяется модерацией.</strong> Продолжительность ограничения зависит от тяжести нарушения, его последствий, повторности и других обстоятельств.</p>
+            <p><strong>16. Блокировка может быть временной или бессрочной.</strong> В зависимости от ситуации могут применяться различные сроки ограничения доступа, вплоть до постоянной блокировки.</p>
+            <p><strong>17. Не пытайтесь обходить блокировку.</strong> Создание новых аккаунтов или использование других способов для обхода применённых ограничений может привести к дополнительным мерам со стороны администрации.</p>
+            <p><strong>18. Администрация может ограничить доступ при серьёзных нарушениях.</strong> В случае грубого нарушения правил пользователь может получить ограничение или блокировку без предварительного предупреждения.</p>
+            <p><strong>19. IceChat не может заранее контролировать поведение каждого собеседника.</strong> Поскольку сервис работает по принципу случайного подбора, вам может попасться пользователь, нарушающий правила. В такой ситуации прекратите разговор, нажмите <strong>STOP</strong> и воспользуйтесь функцией жалобы.</p>
+            <p><strong>20. Пользователь несёт ответственность за свои действия.</strong> Администрация IceChat не одобряет и не поддерживает нарушения правил, совершаемые пользователями сервиса.</p>
+            <p><strong>21. Правила могут изменяться.</strong> Администрация вправе обновлять настоящие правила, уточнять отдельные положения и вводить дополнительные ограничения для обеспечения безопасности и нормальной работы IceChat.</p>
+            <p><strong>22. Запрещено использовать сервис для мошенничества.</strong> Нельзя обманывать пользователей с целью получения денег, доступа к аккаунтам, кодов подтверждения, персональных данных или иной выгоды.</p>
+            <p><strong>23. Не выдавайте себя за администрацию IceChat.</strong> Запрещено представляться сотрудником, модератором или официальным представителем IceChat без соответствующих полномочий.</p>
+            <p><strong>24. Не гарантируется постоянная доступность сервиса.</strong> Работа IceChat может временно ограничиваться из-за технических работ, обновлений, сбоев или других обстоятельств.</p>
+            <p><strong>25. Пользователь может прекратить общение в любой момент.</strong> Если разговор вызывает дискомфорт, прекратите его с помощью кнопки <strong>STOP</strong> или перейдите к следующему собеседнику.</p>
+            <p><strong>26. Не используйте IceChat для навязчивого сбора контактов.</strong> Запрещено массово или навязчиво требовать у пользователей номера телефонов, аккаунты в социальных сетях или другие контактные данные.</p>
+            <p><strong>27. Администрация вправе принимать меры для обеспечения безопасности сервиса.</strong> При наличии оснований администрация может ограничивать доступ пользователей и принимать разумные меры для предотвращения нарушений и обеспечения безопасности IceChat.</p>
+
+            <p class="rules-gate-note">Нажимая «Продолжить», вы подтверждаете, что вам исполнилось 18 лет, вы ознакомились с правилами IceChat и обязуетесь их соблюдать.</p>
+
+        </div>
+
+        <div class="rules-footer">
+
+            <label class="rules-check">
+
+                <input
+                    id="rulesCheckbox"
+                    type="checkbox"
+                >
+
+                <span>
+                    Я ознакомился с правилами и мне исполнилось 18 лет.
+                </span>
+
+            </label>
+
+            <button
+                id="rulesContinue"
+                type="button"
+                class="rules-continue"
+                disabled>
+                Продолжить
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- =========================
+     BAN MODAL
+     ========================= -->
+
+<div
+    id="banModal"
+    class="ban-modal hidden">
+
+    <div class="ban-box">
+
+        <div class="ban-icon">
+            ⛔
+        </div>
+
+        <div class="ban-title">
+            Доступ заблокирован
+        </div>
+
+        <div class="ban-subtitle">
+            Вы не можете пользоваться поиском собеседников
+            до окончания блокировки.
+        </div>
+
+        <div class="ban-info">
+
+            <div class="ban-row">
+
+                <div class="ban-label">
+                    Причина
+                </div>
+
+                <div
+                    id="banReason"
+                    class="ban-value">
+                    —
+                </div>
+
+            </div>
+
+            <div class="ban-row">
+
+                <div class="ban-label">
+                    Срок
+                </div>
+
+                <div
+                    id="banDuration"
+                    class="ban-value">
+                    —
+                </div>
+
+            </div>
+
+            <div
+                id="banUntilRow"
+                class="ban-row">
+
+                <div class="ban-label">
+                    Заблокирован до
+                </div>
+
+                <div
+                    id="banUntil"
+                    class="ban-value">
+                    —
+                </div>
+
+            </div>
+
+        </div>
+
+        <button
+            id="banClose"
+            type="button"
+            class="ban-close">
+            Понятно
+        </button>
+
+    </div>
+
+</div>
+
+<!-- =========================
+     REPORT MODAL
+     ========================= -->
+
+<div
+    id="reportModal"
+    class="report-modal hidden">
+
+    <div class="report-box">
+
+        <div class="report-title">
+            🚩 Пожаловаться
+        </div>
+
+        <div class="report-subtitle">
+            Выберите причину жалобы
+        </div>
+
+        <div class="report-reasons">
+
+            <button
+                type="button"
+                class="report-reason"
+                data-reason="Оскорбления или токсичное поведение">
+                Оскорбления или токсичное поведение
+            </button>
+
+            <button
+                type="button"
+                class="report-reason"
+                data-reason="Непристойный контент">
+                Непристойный контент
+            </button>
+
+            <button
+                type="button"
+                class="report-reason"
+                data-reason="Спам или реклама">
+                Спам или реклама
+            </button>
+
+            <button
+                type="button"
+                class="report-reason"
+                data-reason="Опасное или незаконное поведение">
+                Опасное или незаконное поведение
+            </button>
+
+            <button
+                type="button"
+                class="report-reason"
+                data-reason="Другое">
+                Другое
+            </button>
+
+        </div>
+
+        <textarea
+            id="reportDetails"
+            class="report-details"
+            maxlength="1000"
+            placeholder="Дополнительная информация (необязательно)"></textarea>
+
+        <div class="report-actions">
+
+            <button
+                id="reportCancel"
+                type="button"
+                class="report-cancel">
+                Отмена
+            </button>
+
+            <button
+                id="reportSubmit"
+                type="button"
+                class="report-submit"
+                disabled>
+                Отправить жалобу
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
+
+<script>
+document.addEventListener(
+    "DOMContentLoaded",
+    function () {
+
+        console.log(
+            "ICECHAT INLINE APP START"
+        );
+
+        if (!window.LivekitClient) {
+
+            console.error(
+                "LiveKit Client не загрузился"
+            );
+
+            return;
+        }
+
+        var Room =
+            LivekitClient.Room;
+
+        var RoomEvent =
+            LivekitClient.RoomEvent;
+
+        var Track =
+            LivekitClient.Track;
+
+        var createLocalVideoTrack =
+            LivekitClient
+                .createLocalVideoTrack;
+
+        var createLocalAudioTrack =
+            LivekitClient
+                .createLocalAudioTrack;
+
+        var statusEl =
+            document.getElementById(
+                "status"
+            );
+
+        var rulesModal =
+            document.getElementById(
+                "rulesModal"
+            );
+
+        var rulesCheckbox =
+            document.getElementById(
+                "rulesCheckbox"
+            );
+
+        var rulesContinue =
+            document.getElementById(
+                "rulesContinue"
+            );
+
+        var rulesOpenButton =
+            document.getElementById(
+                "rulesOpenButton"
+            );
+
+        var joinButton =
+            document.getElementById(
+                "joinButton"
+            );
+
+        var leaveButton =
+            document.getElementById(
+                "leaveButton"
+            );
+
+        var micButton =
+            document.getElementById(
+                "micButton"
+            );
+
+        var cameraButton =
+            document.getElementById(
+                "cameraButton"
+            );
+
+        var cameraSwitchButton =
+            document.getElementById(
+                "cameraSwitchButton"
+            );
+
+        var reportButton =
+            document.getElementById(
+                "reportButton"
+            );
+
+        var chatToggleButton =
+            document.getElementById(
+                "chatToggleButton"
+            );
+
+        var banModal =
+            document.getElementById(
+                "banModal"
+            );
+
+        var banReason =
+            document.getElementById(
+                "banReason"
+            );
+
+        var banDuration =
+            document.getElementById(
+                "banDuration"
+            );
+
+        var banUntil =
+            document.getElementById(
+                "banUntil"
+            );
+
+        var banUntilRow =
+            document.getElementById(
+                "banUntilRow"
+            );
+
+        var banClose =
+            document.getElementById(
+                "banClose"
+            );
+
+        var reportModal =
+            document.getElementById(
+                "reportModal"
+            );
+
+        var reportCancel =
+            document.getElementById(
+                "reportCancel"
+            );
+
+        var reportSubmit =
+            document.getElementById(
+                "reportSubmit"
+            );
+
+        var reportDetails =
+            document.getElementById(
+                "reportDetails"
+            );
+
+        var localVideo =
+            document.getElementById(
+                "localVideo"
+            );
+
+        var remoteVideo =
+            document.getElementById(
+                "remoteVideo"
+            );
+
+        var remotePlaceholder =
+            document.getElementById(
+                "remotePlaceholder"
+            );
+
+        var remoteInfo =
+            document.getElementById(
+                "remoteInfo"
+            );
+
+        var remoteGender =
+            document.getElementById(
+                "remoteGender"
+            );
+
+        var remoteCountry =
+            document.getElementById(
+                "remoteCountry"
+            );
+
+        var callTimer =
+            document.getElementById(
+                "callTimer"
+            );
+
+        /* =========================
+           RULES
+           ========================= */
+
+        function openRules() {
+
+            rulesModal.classList.remove(
+                "hidden"
+            );
+
+            rulesCheckbox.checked =
+                false;
+
+            rulesContinue.disabled =
+                true;
+        }
+
+        function closeRules() {
+
+            if (
+                !rulesCheckbox.checked
+            ) {
+                return;
+            }
+
+            rulesModal.classList.add(
+                "hidden"
+            );
+        }
+
+        rulesCheckbox.addEventListener(
+            "change",
+            function () {
+
+                rulesContinue.disabled =
+                    !rulesCheckbox.checked;
+            }
+        );
+
+        rulesContinue.addEventListener(
+            "click",
+            function () {
+
+                if (
+                    !rulesCheckbox.checked
+                ) {
+                    return;
+                }
+
+                rulesModal.classList.add(
+                    "hidden"
+                );
+            }
+        );
+
+        rulesOpenButton.addEventListener(
+            "click",
+            function () {
+
+                openRules();
+            }
+        );
+
+        function initRules() {
+
+            /* The rules gate is shown on every new page load. */
+            rulesCheckbox.checked = false;
+            rulesContinue.disabled = true;
+            rulesModal.classList.remove("hidden");
+        }
+
+        /* =========================
+           REPORT STATE
+           ========================= */
+
+        var selectedReportReason =
+            null;
+
+        var reportSentThisConnection =
+            false;
+
+        /* =========================
+           CHAT
+           ========================= */
+
+        var chatStatus =
+            document.getElementById(
+                "chatStatus"
+            );
+
+        var chatMessages =
+            document.getElementById(
+                "chatMessages"
+            );
+
+        var chatEmpty =
+            document.getElementById(
+                "chatEmpty"
+            );
+
+        var chatForm =
+            document.getElementById(
+                "chatForm"
+            );
+
+        var chatInput =
+            document.getElementById(
+                "chatInput"
+            );
+
+        var chatSend =
+            document.getElementById(
+                "chatSend"
+            );
+
+        var chatHistory = [];
+
+        /* =========================
+           STATE
+           ========================= */
+
+        var myGender = null;
+        var searchGender = "any";
+
+        var socketId = null;
+        var room = null;
+
+        var localVideoTrack = null;
+        var localAudioTrack = null;
+
+        var searching = false;
+        var connected = false;
+
+        var checkTimer = null;
+
+        var remoteAudio = null;
+
+        var timerInterval = null;
+        var connectionStartTime = null;
+
+        var cameraFacingMode = "user";
+
+        var microphoneMuted = false;
+        var cameraMuted = false;
+
+        var leavingLocally = false;
+        var stopping = false;
+        var chatVisible = true;
+
+        var currentBanExpiresAt = null;
+        var currentBanTimer = null;
+
+        /* =========================
+           UI
+           ========================= */
+
+        function setStatus(text) {
+
+            statusEl.textContent =
+                text;
+        }
+
+        function updateButtons() {
+
+            joinButton.disabled =
+                searching ||
+                connected ||
+                !!currentBanExpiresAt;
+
+            leaveButton.disabled =
+                !searching &&
+                !connected;
+
+            micButton.disabled =
+                !connected ||
+                !localAudioTrack;
+
+            cameraButton.disabled =
+                !localVideoTrack;
+
+            cameraSwitchButton.disabled =
+                !localVideoTrack;
+
+            reportButton.disabled =
+                !connected ||
+                reportSentThisConnection;
+
+            chatInput.disabled =
+                !connected;
+
+            chatSend.disabled =
+                !connected;
+
+            if (chatToggleButton) {
+                chatToggleButton.textContent =
+                    chatVisible
+                        ? (currentLanguage === "en" ? "💬 Hide chat" : "💬 Скрыть чат")
+                        : (currentLanguage === "en" ? "💬 Show chat" : "💬 Текстовый чат");
+                chatToggleButton.setAttribute(
+                    "aria-expanded",
+                    chatVisible ? "true" : "false"
+                );
+            }
+        }
+
+        function updateChatStatus() {
+
+            if (currentBanExpiresAt) {
+
+                chatStatus.textContent =
+                    "Доступ заблокирован";
+
+            } else if (connected) {
+
+                chatStatus.textContent =
+                    "Собеседник подключён";
+
+            } else if (searching) {
+
+                chatStatus.textContent =
+                    "Ожидание собеседника...";
+
+            } else {
+
+                chatStatus.textContent =
+                    "Нет соединения";
+            }
+        }
+
+        /* =========================
+           BAN UI
+           ========================= */
+
+        function formatBanDate(
+            expiresAt
+        ) {
+
+            if (!expiresAt) {
+                return "Навсегда";
+            }
+
+            var date =
+                new Date(
+                    expiresAt
+                );
+
+            if (
+                Number.isNaN(
+                    date.getTime()
+                )
+            ) {
+                return "Неизвестно";
+            }
+
+            return date.toLocaleString(
+                "ru-RU",
+                {
+                    dateStyle:
+                        "medium",
+
+                    timeStyle:
+                        "short"
+                }
+            );
+        }
+
+        function getBanRemaining(
+            expiresAt
+        ) {
+
+            if (!expiresAt) {
+                return "Навсегда";
+            }
+
+            var target =
+                new Date(
+                    expiresAt
+                ).getTime();
+
+            if (
+                !Number.isFinite(
+                    target
+                )
+            ) {
+                return "Неизвестно";
+            }
+
+            var diff =
+                Math.max(
+                    0,
+                    target -
+                    Date.now()
+                );
+
+            var totalSeconds =
+                Math.ceil(
+                    diff / 1000
+                );
+
+            if (
+                totalSeconds <= 0
+            ) {
+                return "Блокировка закончилась";
+            }
+
+            var days =
+                Math.floor(
+                    totalSeconds /
+                    86400
+                );
+
+            var hours =
+                Math.floor(
+                    (
+                        totalSeconds %
+                        86400
+                    ) / 3600
+                );
+
+            var minutes =
+                Math.floor(
+                    (
+                        totalSeconds %
+                        3600
+                    ) / 60
+                );
+
+            var seconds =
+                totalSeconds %
+                60;
+
+            if (days > 0) {
+
+                return (
+                    days +
+                    " д. " +
+                    hours +
+                    " ч."
+                );
+            }
+
+            if (hours > 0) {
+
+                return (
+                    hours +
+                    " ч. " +
+                    minutes +
+                    " мин."
+                );
+            }
+
+            if (minutes > 0) {
+
+                return (
+                    minutes +
+                    " мин. " +
+                    seconds +
+                    " сек."
+                );
+            }
+
+            return (
+                seconds +
+                " сек."
+            );
+        }
+
+        function clearBanState() {
+
+            currentBanExpiresAt =
+                null;
+
+            if (currentBanTimer) {
+
+                clearInterval(
+                    currentBanTimer
+                );
+
+                currentBanTimer =
+                    null;
+            }
+
+            banModal.classList.add(
+                "hidden"
+            );
+
+            banReason.textContent =
+                "—";
+
+            banDuration.textContent =
+                "—";
+
+            banUntil.textContent =
+                "—";
+
+            updateButtons();
+            updateChatStatus();
+        }
+
+        function startBanCountdown() {
+
+            if (currentBanTimer) {
+
+                clearInterval(
+                    currentBanTimer
+                );
+            }
+
+            if (!currentBanExpiresAt) {
+                return;
+            }
+
+            currentBanTimer =
+                setInterval(
+                    function () {
+
+                        if (
+                            !currentBanExpiresAt
+                        ) {
+                            return;
+                        }
+
+                        var target =
+                            new Date(
+                                currentBanExpiresAt
+                            ).getTime();
+
+                        if (
+                            !Number.isFinite(
+                                target
+                            ) ||
+                            Date.now() >=
+                                target
+                        ) {
+
+                            clearBanState();
+
+                            setStatus(
+                                "Блокировка закончилась"
+                            );
+
+                            return;
+                        }
+
+                        banDuration.textContent =
+                            getBanRemaining(
+                                currentBanExpiresAt
+                            );
+
+                    },
+                    1000
+                );
+        }
+
+        function showBanModal(
+            reason,
+            expiresAt
+        ) {
+
+            currentBanExpiresAt =
+                expiresAt ||
+                null;
+
+            banReason.textContent =
+                reason ||
+                "Нарушение правил";
+
+            if (expiresAt) {
+
+                banDuration.textContent =
+                    getBanRemaining(
+                        expiresAt
+                    );
+
+                banUntil.textContent =
+                    formatBanDate(
+                        expiresAt
+                    );
+
+            } else {
+
+                banDuration.textContent =
+                    "Навсегда";
+
+                banUntil.textContent =
+                    "Навсегда";
+            }
+
+            banUntilRow.classList.remove(
+                "hidden"
+            );
+
+            banModal.classList.remove(
+                "hidden"
+            );
+
+            setStatus(
+                "Доступ заблокирован"
+            );
+
+            updateButtons();
+            updateChatStatus();
+
+            startBanCountdown();
+        }
+
+        banClose.addEventListener(
+            "click",
+            function () {
+
+                banModal.classList.add(
+                    "hidden"
+                );
+            }
+        );
+
+        banModal.addEventListener(
+            "click",
+            function (event) {
+
+                if (
+                    event.target ===
+                    banModal
+                ) {
+
+                    banModal.classList.add(
+                        "hidden"
+                    );
+                }
+            }
+        );
+
+        /* =========================
+           CHAT HISTORY
+           ========================= */
+
+        function resetChatHistory() {
+
+            chatHistory = [];
+        }
+
+        function addHistoryMessage(
+            text,
+            mine
+        ) {
+
+            if (!text) {
+                return;
+            }
+
+            chatHistory.push({
+
+                side:
+                    mine
+                        ? "Вы"
+                        : "Собеседник",
+
+                text:
+                    text,
+
+                timestamp:
+                    new Date()
+                        .toISOString()
+            });
+        }
+
+        /* =========================
+           REPORT
+           ========================= */
+
+        function resetReportUI() {
+
+            selectedReportReason =
+                null;
+
+            reportSentThisConnection =
+                false;
+
+            reportDetails.value =
+                "";
+
+            document
+                .querySelectorAll(
+                    ".report-reason"
+                )
+                .forEach(
+                    function (button) {
+
+                        button.classList.remove(
+                            "selected"
+                        );
+                    }
+                );
+
+            reportSubmit.disabled =
+                true;
+
+            reportSubmit.textContent =
+                "Отправить жалобу";
+
+            reportButton.textContent =
+                "🚩 Пожаловаться";
+        }
+
+        function openReportModal() {
+
+            if (
+                !connected ||
+                reportSentThisConnection
+            ) {
+                return;
+            }
+
+            selectedReportReason =
+                null;
+
+            reportDetails.value =
+                "";
+
+            document
+                .querySelectorAll(
+                    ".report-reason"
+                )
+                .forEach(
+                    function (button) {
+
+                        button.classList.remove(
+                            "selected"
+                        );
+                    }
+                );
+
+            reportSubmit.disabled =
+                true;
+
+            reportSubmit.textContent =
+                "Отправить жалобу";
+
+            reportModal.classList.remove(
+                "hidden"
+            );
+        }
+
+        function closeReportModal() {
+
+            reportModal.classList.add(
+                "hidden"
+            );
+        }
+
+        function captureRemoteEvidence() {
+
+            try {
+
+                if (
+                    !remoteVideo ||
+                    !remoteVideo.videoWidth ||
+                    !remoteVideo.videoHeight
+                ) {
+
+                    return null;
+                }
+
+                var canvas =
+                    document.createElement(
+                        "canvas"
+                    );
+
+                var maxWidth =
+                    960;
+
+                var width =
+                    Math.min(
+                        remoteVideo.videoWidth,
+                        maxWidth
+                    );
+
+                var height =
+                    Math.round(
+                        remoteVideo.videoHeight *
+                        (
+                            width /
+                            remoteVideo.videoWidth
+                        )
+                    );
+
+                canvas.width =
+                    width;
+
+                canvas.height =
+                    height;
+
+                var context =
+                    canvas.getContext(
+                        "2d"
+                    );
+
+                if (!context) {
+                    return null;
+                }
+
+                context.drawImage(
+                    remoteVideo,
+                    0,
+                    0,
+                    width,
+                    height
+                );
+
+                return canvas.toDataURL(
+                    "image/jpeg",
+                    0.72
+                );
+
+            } catch (error) {
+
+                console.error(
+                    "CAPTURE EVIDENCE ERROR:",
+                    error
+                );
+
+                return null;
+            }
+        }
+
+        async function submitReport() {
+
+            if (
+                !connected ||
+                !selectedReportReason ||
+                reportSentThisConnection
+            ) {
+                return;
+            }
+
+            reportSubmit.disabled =
+                true;
+
+            reportSubmit.textContent =
+                "Сохраняем доказательства...";
+
+            try {
+
+                var evidenceImage =
+                    captureRemoteEvidence();
+
+                var response =
+                    await fetch(
+                        "/api/report",
+                        {
+                            method:
+                                "POST",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+
+                            body:
+                                JSON.stringify({
+
+                                    reason:
+                                        selectedReportReason,
+
+                                    details:
+                                        reportDetails
+                                            .value
+                                            .trim(),
+
+                                    roomName:
+                                        room
+                                            ? room.name
+                                            : "unknown",
+
+                                    chatHistory:
+                                        chatHistory,
+
+                                    evidenceImage:
+                                        evidenceImage,
+
+                                    evidenceCapturedAt:
+                                        new Date()
+                                            .toISOString()
+                                })
+                        }
+                    );
+
+                var result =
+                    await response
+                        .json()
+                        .catch(
+                            function () {
+                                return {};
+                            }
+                        );
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        result.error ||
+                        "Report request failed"
+                    );
+                }
+
+                reportSentThisConnection =
+                    true;
+
+                closeReportModal();
+
+                reportButton.textContent =
+                    "✅ Жалоба отправлена";
+
+                updateButtons();
+
+                setStatus(
+                    evidenceImage
+                        ? "Жалоба отправлена"
+                        : "Жалоба отправлена, но кадр видео недоступен"
+                );
+
+            } catch (error) {
+
+                console.error(
+                    "REPORT ERROR:",
+                    error
+                );
+
+                reportSubmit.disabled =
+                    false;
+
+                reportSubmit.textContent =
+                    "Отправить жалобу";
+
+                setStatus(
+                    "Не удалось отправить жалобу"
+                );
+            }
+        }
+
+        reportButton.addEventListener(
+            "click",
+            function () {
+
+                openReportModal();
+            }
+        );
+
+        reportCancel.addEventListener(
+            "click",
+            function () {
+
+                closeReportModal();
+            }
+        );
+
+        document
+            .querySelectorAll(
+                ".report-reason"
+            )
+            .forEach(
+                function (button) {
+
+                    button.addEventListener(
+                        "click",
+                        function () {
+
+                            selectedReportReason =
+                                button.getAttribute(
+                                    "data-reason"
+                                );
+
+                            document
+                                .querySelectorAll(
+                                    ".report-reason"
+                                )
+                                .forEach(
+                                    function (
+                                        item
+                                    ) {
+
+                                        item.classList.remove(
+                                            "selected"
+                                        );
+                                    }
+                                );
+
+                            button.classList.add(
+                                "selected"
+                            );
+
+                            reportSubmit.disabled =
+                                false;
+                        }
+                    );
+                }
+            );
+
+        reportSubmit.addEventListener(
+            "click",
+            function () {
+
+                submitReport();
+            }
+        );
+
+        reportModal.addEventListener(
+            "click",
+            function (event) {
+
+                if (
+                    event.target ===
+                    reportModal
+                ) {
+
+                    closeReportModal();
+                }
+            }
+        );
+
+        /* =========================
+           CHAT
+           ========================= */
+
+        function clearChat() {
+
+            while (
+                chatMessages.firstChild
+            ) {
+
+                chatMessages.removeChild(
+                    chatMessages.firstChild
+                );
+            }
+
+            chatMessages.appendChild(
+                chatEmpty
+            );
+
+            chatEmpty.style.display =
+                "block";
+        }
+
+        function addChatMessage(
+            text,
+            mine
+        ) {
+
+            if (!text) {
+                return;
+            }
+
+            addHistoryMessage(
+                text,
+                mine
+            );
+
+            if (chatEmpty) {
+
+                chatEmpty.style.display =
+                    "none";
+            }
+
+            var message =
+                document.createElement(
+                    "div"
+                );
+
+            message.className =
+                "chat-message " +
+                (
+                    mine
+                        ? "mine"
+                        : "theirs"
+                );
+
+            message.textContent =
+                text;
+
+            chatMessages.appendChild(
+                message
+            );
+
+            chatMessages.scrollTop =
+                chatMessages.scrollHeight;
+        }
+
+        async function sendChatMessage(
+            text
+        ) {
+
+            if (
+                !connected ||
+                !room ||
+                !text
+            ) {
+                return;
+            }
+
+            var cleanText =
+                text.trim();
+
+            if (!cleanText) {
+                return;
+            }
+
+            try {
+
+                var payload =
+                    JSON.stringify({
+                        type:
+                            "chat",
+
+                        text:
+                            cleanText
+                    });
+
+                var data =
+                    new TextEncoder()
+                        .encode(
+                            payload
+                        );
+
+                await room
+                    .localParticipant
+                    .publishData(
+                        data,
+                        {
+                            reliable:
+                                true,
+
+                            topic:
+                                "icechat-chat"
+                        }
+                    );
+
+                addChatMessage(
+                    cleanText,
+                    true
+                );
+
+            } catch (error) {
+
+                console.error(
+                    "CHAT SEND ERROR:",
+                    error
+                );
+
+                setStatus(
+                    "Не удалось отправить сообщение"
+                );
+            }
+        }
+
+        function handleChatData(
+            payload,
+            participant,
+            kind,
+            topic
+        ) {
+
+            try {
+
+                if (
+                    topic &&
+                    topic !==
+                        "icechat-chat"
+                ) {
+                    return;
+                }
+
+                var text =
+                    new TextDecoder()
+                        .decode(
+                            payload
+                        );
+
+                var message =
+                    JSON.parse(
+                        text
+                    );
+
+                if (
+                    !message ||
+                    message.type !==
+                        "chat"
+                ) {
+                    return;
+                }
+
+                if (
+                    typeof message.text !==
+                    "string"
+                ) {
+                    return;
+                }
+
+                var cleanText =
+                    message.text.trim();
+
+                if (!cleanText) {
+                    return;
+                }
+
+                addChatMessage(
+                    cleanText,
+                    false
+                );
+
+            } catch (error) {
+
+                console.error(
+                    "CHAT RECEIVE ERROR:",
+                    error
+                );
+            }
+        }
+
+        /* =========================
+           TIMER
+           ========================= */
+
+        function formatTime(
+            totalSeconds
+        ) {
+
+            var minutes =
+                Math.floor(
+                    totalSeconds /
+                    60
+                );
+
+            var seconds =
+                totalSeconds %
+                60;
+
+            return (
+                String(minutes)
+                    .padStart(
+                        2,
+                        "0"
+                    ) +
+                ":" +
+                String(seconds)
+                    .padStart(
+                        2,
+                        "0"
+                    )
+            );
+        }
+
+        function resetTimer() {
+
+            if (timerInterval) {
+
+                clearInterval(
+                    timerInterval
+                );
+
+                timerInterval =
+                    null;
+            }
+
+            connectionStartTime =
+                null;
+
+            callTimer.textContent =
+                "00:00";
+        }
+
+        function startTimer() {
+
+            resetTimer();
+
+            connectionStartTime =
+                Date.now();
+
+            timerInterval =
+                setInterval(
+                    function () {
+
+                        if (
+                            !connectionStartTime
+                        ) {
+                            return;
+                        }
+
+                        var elapsed =
+                            Math.floor(
+                                (
+                                    Date.now() -
+                                    connectionStartTime
+                                ) / 1000
+                            );
+
+                        callTimer.textContent =
+                            formatTime(
+                                elapsed
+                            );
+
+                    },
+                    1000
+                );
+        }
+
+        /* =========================
+           COUNTRY
+           ========================= */
+
+        function getFlag(
+            code
+        ) {
+
+            if (!code) {
+                return "🌐";
+            }
+
+            code =
+                String(code)
+                    .toUpperCase();
+
+            if (
+                code.length !== 2
+            ) {
+                return "🌐";
+            }
+
+            return (
+                String.fromCodePoint(
+                    127397 +
+                    code.charCodeAt(0)
+                ) +
+                String.fromCodePoint(
+                    127397 +
+                    code.charCodeAt(1)
+                )
+            );
+        }
+
+        function showPeerInfo(
+            peer
+        ) {
+
+            if (!peer) {
+                return;
+            }
+
+            remoteInfo.classList.remove(
+                "hidden"
+            );
+
+            if (
+                peer.gender ===
+                "male"
+            ) {
+
+                remoteGender.innerHTML =
+                    '<span class="gender-symbol male">♂</span> ' +
+                    (currentLanguage === "en" ? "Male" : "Мужчина");
+
+            } else if (
+                peer.gender ===
+                "female"
+            ) {
+
+                remoteGender.innerHTML =
+                    '<span class="gender-symbol female">♀</span> ' +
+                    (currentLanguage === "en" ? "Female" : "Женщина");
+
+            } else {
+
+                remoteGender.textContent =
+                    "👤 Собеседник";
+            }
+
+            var code =
+                "UN";
+
+            if (peer.country) {
+
+                if (
+                    typeof peer.country ===
+                    "object"
+                ) {
+
+                    code =
+                        peer.country.code ||
+                        peer.country.countryCode ||
+                        "UN";
+
+                } else {
+
+                    code =
+                        peer.country;
+                }
+            }
+
+            code =
+                String(code)
+                    .toUpperCase();
+
+            remoteCountry.textContent =
+                getFlag(code) +
+                " " +
+                code;
+        }
+
+        /* =========================
+           VIDEO / AUDIO
+           ========================= */
+
+        function attachLocal(
+            track
+        ) {
+
+            if (!track) {
+                return;
+            }
+
+            try {
+
+                track.attach(
+                    localVideo
+                );
+
+                localVideo.autoplay =
+                    true;
+
+                localVideo.muted =
+                    true;
+
+                localVideo.playsInline =
+                    true;
+
+                localVideo.play()
+                    .catch(
+                        function () {}
+                    );
+
+            } catch (error) {
+
+                console.error(
+                    "Ошибка своей камеры:",
+                    error
+                );
+            }
+        }
+
+        function attachRemote(
+            track
+        ) {
+
+            if (!track) {
+                return;
+            }
+
+            try {
+
+                track.attach(
+                    remoteVideo
+                );
+
+                remoteVideo.autoplay =
+                    true;
+
+                remoteVideo.playsInline =
+                    true;
+
+                remotePlaceholder
+                    .style
+                    .display =
+                    "none";
+
+                remoteVideo.play()
+                    .catch(
+                        function () {}
+                    );
+
+            } catch (error) {
+
+                console.error(
+                    "Ошибка камеры собеседника:",
+                    error
+                );
+            }
+        }
+
+        function attachAudio(
+            track
+        ) {
+
+            if (!track) {
+                return;
+            }
+
+            try {
+
+                if (remoteAudio) {
+
+                    try {
+                        remoteAudio.remove();
+                    } catch (error) {}
+                }
+
+                remoteAudio =
+                    document.createElement(
+                        "audio"
+                    );
+
+                remoteAudio.autoplay =
+                    true;
+
+                document.body.appendChild(
+                    remoteAudio
+                );
+
+                track.attach(
+                    remoteAudio
+                );
+
+                remoteAudio
+                    .play()
+                    .catch(
+                        function () {}
+                    );
+
+            } catch (error) {
+
+                console.error(
+                    "Ошибка звука:",
+                    error
+                );
+            }
+        }
+
+        /* =========================
+           LOCAL MEDIA
+           ========================= */
+
+        async function startLocalMedia() {
+
+            try {
+
+                if (!localVideoTrack) {
+
+                    setStatus(
+                        "Запуск камеры..."
+                    );
+
+                    localVideoTrack =
+                        await
+                        createLocalVideoTrack();
+
+                    attachLocal(
+                        localVideoTrack
+                    );
+                }
+
+                if (!localAudioTrack) {
+
+                    localAudioTrack =
+                        await
+                        createLocalAudioTrack();
+                }
+
+                updateButtons();
+                updateChatStatus();
+
+                return true;
+
+            } catch (error) {
+
+                console.error(
+                    "Ошибка камеры/микрофона:",
+                    error
+                );
+
+                localVideoTrack =
+                    null;
+
+                localAudioTrack =
+                    null;
+
+                setStatus(
+                    "Не удалось получить камеру или микрофон"
+                );
+
+                updateButtons();
+                updateChatStatus();
+
+                return false;
+            }
+        }
+
+        /* =========================
+           CAMERA SWITCH
+           ========================= */
+
+        async function switchCamera() {
+
+            if (!localVideoTrack) {
+                return;
+            }
+
+            try {
+
+                cameraSwitchButton.disabled =
+                    true;
+
+                var newFacingMode =
+                    cameraFacingMode ===
+                        "user"
+                        ? "environment"
+                        : "user";
+
+                setStatus(
+                    "Переключение камеры..."
+                );
+
+                await localVideoTrack
+                    .restartTrack({
+                        facingMode:
+                            newFacingMode
+                    });
+
+                cameraFacingMode =
+                    newFacingMode;
+
+                attachLocal(
+                    localVideoTrack
+                );
+
+                if (connected) {
+
+                    setStatus(
+                        "Собеседник подключён"
+                    );
+
+                } else if (searching) {
+
+                    setStatus(
+                        "Поиск собеседника..."
+                    );
+
+                } else {
+
+                    setStatus(
+                        "Готов к поиску"
+                    );
+                }
+
+            } catch (error) {
+
+                console.error(
+                    "CAMERA SWITCH ERROR:",
+                    error
+                );
+
+                setStatus(
+                    "Вторая камера недоступна"
+                );
+
+            } finally {
+
+                updateButtons();
+            }
+        }
+
+        /* =========================
+           LIVEKIT
+           ========================= */
+
+        async function connectToRoom(
+            roomName,
+            peer
+        ) {
+
+            try {
+
+                setStatus(
+                    "Подключение..."
+                );
+
+                var mediaReady =
+                    await startLocalMedia();
+
+                if (!mediaReady) {
+
+                    throw new Error(
+                        "Local media unavailable"
+                    );
+                }
+
+                var response =
+                    await fetch(
+                        "/api/livekit-token?room=" +
+                        encodeURIComponent(
+                            roomName
+                        )
+                    );
+
+                if (!response.ok) {
+
+                    var tokenError =
+                        await response
+                            .json()
+                            .catch(
+                                function () {
+                                    return {};
+                                }
+                            );
+
+                    if (
+                        tokenError.error ===
+                        "USER_BANNED"
+                    ) {
+
+                        connected =
+                            false;
+
+                        searching =
+                            false;
+
+                        showBanModal(
+                            tokenError.reason,
+                            tokenError.expiresAt
+                        );
+
+                        updateButtons();
+                        updateChatStatus();
+
+                        return;
+                    }
+
+                    throw new Error(
+                        "Не удалось получить LiveKit token"
+                    );
+                }
+
+                var tokenData =
+                    await response.json();
+
+                room =
+                    new Room({
+                        adaptiveStream:
+                            true,
+
+                        dynacast:
+                            true
+                    });
+
+                room.on(
+                    RoomEvent.DataReceived,
+                    handleChatData
+                );
+
+                room.on(
+                    RoomEvent.TrackSubscribed,
+                    function (track) {
+
+                        if (
+                            track.kind ===
+                            Track.Kind.Video
+                        ) {
+
+                            attachRemote(
+                                track
+                            );
+                        }
+
+                        if (
+                            track.kind ===
+                            Track.Kind.Audio
+                        ) {
+
+                            attachAudio(
+                                track
+                            );
+                        }
+                    }
+                );
+
+                room.on(
+                    RoomEvent.TrackUnsubscribed,
+                    function (track) {
+
+                        try {
+
+                            track.detach(
+                                remoteVideo
+                            );
+
+                        } catch (error) {}
+
+                        try {
+
+                            track.detach();
+
+                        } catch (error) {}
+                    }
+                );
+
+                room.on(
+                    RoomEvent.ParticipantDisconnected,
+                    function (
+                        participant
+                    ) {
+
+                        console.log(
+                            "PARTICIPANT DISCONNECTED:",
+                            participant.identity
+                        );
+
+                        if (
+                            leavingLocally
+                        ) {
+                            return;
+                        }
+
+                        connected =
+                            false;
+
+                        searching =
+                            false;
+
+                        if (checkTimer) {
+
+                            clearInterval(
+                                checkTimer
+                            );
+
+                            checkTimer =
+                                null;
+                        }
+
+                        resetTimer();
+                        clearRemote();
+                        clearChat();
+                        resetChatHistory();
+
+                        resetReportUI();
+
+                        setStatus(
+                            "Собеседник отключился"
+                        );
+
+                        updateButtons();
+                        updateChatStatus();
+                    }
+                );
+
+                room.on(
+                    RoomEvent.Disconnected,
+                    function () {
+
+                        if (
+                            leavingLocally
+                        ) {
+                            return;
+                        }
+
+                        connected =
+                            false;
+
+                        searching =
+                            false;
+
+                        if (checkTimer) {
+
+                            clearInterval(
+                                checkTimer
+                            );
+
+                            checkTimer =
+                                null;
+                        }
+
+                        resetTimer();
+                        clearRemote();
+                        clearChat();
+                        resetChatHistory();
+
+                        resetReportUI();
+
+                        setStatus(
+                            "Соединение завершено"
+                        );
+
+                        updateButtons();
+                        updateChatStatus();
+                    }
+                );
+
+                await room.connect(
+                    tokenData.url,
+                    tokenData.token
+                );
+
+                microphoneMuted =
+                    false;
+
+                cameraMuted =
+                    false;
+
+                reportSentThisConnection =
+                    false;
+
+                resetChatHistory();
+
+                micButton.textContent =
+                    "🎤 Микрофон";
+
+                cameraButton.textContent =
+                    "📷 Камера";
+
+                reportButton.textContent =
+                    "🚩 Пожаловаться";
+
+                await room
+                    .localParticipant
+                    .publishTrack(
+                        localVideoTrack
+                    );
+
+                await room
+                    .localParticipant
+                    .publishTrack(
+                        localAudioTrack
+                    );
+
+                room
+                    .remoteParticipants
+                    .forEach(
+                        function (
+                            participant
+                        ) {
+
+                            participant
+                                .trackPublications
+                                .forEach(
+                                    function (
+                                        publication
+                                    ) {
+
+                                        if (
+                                            !publication.track
+                                        ) {
+                                            return;
+                                        }
+
+                                        if (
+                                            publication
+                                                .track
+                                                .kind ===
+                                            Track.Kind.Video
+                                        ) {
+
+                                            attachRemote(
+                                                publication.track
+                                            );
+                                        }
+
+                                        if (
+                                            publication
+                                                .track
+                                                .kind ===
+                                            Track.Kind.Audio
+                                        ) {
+
+                                            attachAudio(
+                                                publication.track
+                                            );
+                                        }
+                                    }
+                                );
+                        }
+                    );
+
+                connected =
+                    true;
+
+                searching =
+                    false;
+
+                showPeerInfo(
+                    peer
+                );
+
+                clearChat();
+
+                startTimer();
+
+                setStatus(
+                    "Собеседник подключён"
+                );
+
+                updateButtons();
+                updateChatStatus();
+
+                if (
+                    window.innerWidth >
+                    600
+                ) {
+
+                    chatInput.focus();
+                }
+
+                if (checkTimer) {
+
+                    clearInterval(
+                        checkTimer
+                    );
+                }
+
+                checkTimer =
+                    setInterval(
+                        checkMatch,
+                        1000
+                    );
+
+            } catch (error) {
+
+                console.error(
+                    "LIVEKIT ERROR:",
+                    error
+                );
+
+                connected =
+                    false;
+
+                searching =
+                    false;
+
+                resetTimer();
+                clearChat();
+                resetChatHistory();
+
+                resetReportUI();
+
+                setStatus(
+                    error.message ===
+                        "Пользователь заблокирован"
+                        ? "Ваш доступ заблокирован"
+                        : "Ошибка подключения"
+                );
+
+                updateButtons();
+                updateChatStatus();
+            }
+        }
+
+        /* =========================
+           SEARCH
+           ========================= */
+
+        async function startSearch() {
+
+            if (
+                searching ||
+                connected ||
+                currentBanExpiresAt
+            ) {
+                return;
+            }
+
+            if (!myGender) {
+
+                setStatus(
+                    "Сначала выберите свой пол"
+                );
+
+                return;
+            }
+
+            var mediaReady =
+                await startLocalMedia();
+
+            if (!mediaReady) {
+                return;
+            }
+
+            searching =
+                true;
+
+            resetTimer();
+            clearChat();
+            resetChatHistory();
+            resetReportUI();
+
+            updateButtons();
+            updateChatStatus();
+
+            setStatus(
+                "Поиск собеседника..."
+            );
+
+            socketId =
+                "ice_" +
+                Date.now() +
+                "_" +
+                Math.random()
+                    .toString(36)
+                    .substring(
+                        2,
+                        10
+                    );
+
+            try {
+
+                var response =
+                    await fetch(
+                        "/api/match/start",
+                        {
+                            method:
+                                "POST",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+
+                            body:
+                                JSON.stringify({
+                                    socketId:
+                                        socketId,
+
+                                    gender:
+                                        myGender,
+
+                                    searchGender:
+                                        searchGender
+                                })
+                        }
+                    );
+
+                var data =
+                    await response.json();
+
+                if (
+                    response.status ===
+                    403 &&
+                    data.error ===
+                    "USER_BANNED"
+                ) {
+
+                    searching =
+                        false;
+
+                    connected =
+                        false;
+
+                    showBanModal(
+                        data.reason,
+                        data.expiresAt
+                    );
+
+                    updateButtons();
+                    updateChatStatus();
+
+                    return;
+                }
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        "Match start error"
+                    );
+                }
+
+                console.log(
+                    "MATCH START:",
+                    data
+                );
+
+                if (
+                    data.status ===
+                        "matched" &&
+                    data.roomName
+                ) {
+
+                    await connectToRoom(
+                        data.roomName,
+                        data.peer ||
+                        null
+                    );
+
+                    return;
+                }
+
+                if (checkTimer) {
+
+                    clearInterval(
+                        checkTimer
+                    );
+                }
+
+                checkTimer =
+                    setInterval(
+                        checkMatch,
+                        1000
+                    );
+
+            } catch (error) {
+
+                console.error(
+                    "MATCH ERROR:",
+                    error
+                );
+
+                searching =
+                    false;
+
+                setStatus(
+                    "Ошибка поиска"
+                );
+
+                updateButtons();
+                updateChatStatus();
+            }
+        }
+
+        /* =========================
+           CHECK MATCH
+           ========================= */
+
+        async function checkMatch() {
+
+            if (
+                (
+                    !searching &&
+                    !connected
+                ) ||
+                !socketId
+            ) {
+                return;
+            }
+
+            try {
+
+                var response =
+                    await fetch(
+                        "/api/match/check?socketId=" +
+                        encodeURIComponent(
+                            socketId
+                        )
+                    );
+
+                if (!response.ok) {
+                    return;
+                }
+
+                var data =
+                    await response.json();
+
+                console.log(
+                    "MATCH CHECK:",
+                    data
+                );
+
+                if (
+                    data.status ===
+                    "peerLeft"
+                ) {
+
+                    if (checkTimer) {
+
+                        clearInterval(
+                            checkTimer
+                        );
+
+                        checkTimer =
+                            null;
+                    }
+
+                    if (room) {
+
+                        leavingLocally =
+                            true;
+
+                        try {
+
+                            room.disconnect();
+
+                        } catch (error) {}
+
+                        room =
+                            null;
+
+                        leavingLocally =
+                            false;
+                    }
+
+                    connected =
+                        false;
+
+                    searching =
+                        false;
+
+                    resetTimer();
+                    clearRemote();
+                    clearChat();
+                    resetChatHistory();
+                    resetReportUI();
+
+                    setStatus(
+                        "Собеседник отключился"
+                    );
+
+                    updateButtons();
+                    updateChatStatus();
+
+                    return;
+                }
+
+                if (
+                    data.status ===
+                    "ended"
+                ) {
+                    return;
+                }
+
+                if (
+                    data.status ===
+                        "matched" &&
+                    data.roomName
+                ) {
+
+                    if (checkTimer) {
+
+                        clearInterval(
+                            checkTimer
+                        );
+
+                        checkTimer =
+                            null;
+                    }
+
+                    await connectToRoom(
+                        data.roomName,
+                        data.peer ||
+                        null
+                    );
+                }
+
+            } catch (error) {
+
+                console.error(
+                    "CHECK ERROR:",
+                    error
+                );
+            }
+        }
+
+        /* =========================
+           CLEAR REMOTE
+           ========================= */
+
+        function clearRemote() {
+
+            if (remoteVideo) {
+
+                try {
+
+                    remoteVideo.srcObject =
+                        null;
+
+                } catch (error) {}
+            }
+
+            if (remotePlaceholder) {
+
+                remotePlaceholder
+                    .style
+                    .display =
+                    "flex";
+            }
+
+            if (remoteInfo) {
+
+                remoteInfo
+                    .classList
+                    .add(
+                        "hidden"
+                    );
+            }
+
+            if (remoteAudio) {
+
+                try {
+                    remoteAudio.pause();
+                } catch (error) {}
+
+                try {
+                    remoteAudio.remove();
+                } catch (error) {}
+
+                remoteAudio =
+                    null;
+            }
+        }
+
+        /* =========================
+           STOP
+           ========================= */
+
+        async function stopEverything() {
+
+            if (stopping) {
+                return;
+            }
+
+            stopping = true;
+            closeReportModal();
+
+            if (checkTimer) {
+                clearInterval(checkTimer);
+                checkTimer = null;
+            }
+
+            searching = false;
+            resetTimer();
+
+            var oldSocketId = socketId;
+
+            /* Сначала мгновенно освобождаем интерфейс и LiveKit.
+               Запрос серверу больше не блокирует кнопку STOP. */
+            leavingLocally = true;
+
+            if (room) {
+                try {
+                    await room.disconnect();
+                } catch (error) {
+                    console.error("LIVEKIT STOP ERROR:", error);
+                }
+                room = null;
+            }
+
+            connected = false;
+            socketId = null;
+
+            if (localVideoTrack) {
+                try {
+                    localVideoTrack.stop();
+                } catch (error) {}
+                localVideoTrack = null;
+            }
+
+            if (localAudioTrack) {
+                try {
+                    localAudioTrack.stop();
+                } catch (error) {}
+                localAudioTrack = null;
+            }
+
+            if (localVideo) {
+                try {
+                    localVideo.srcObject = null;
+                } catch (error) {}
+            }
+
+            clearRemote();
+            clearChat();
+            resetChatHistory();
+            resetReportUI();
+
+            cameraFacingMode = "user";
+            microphoneMuted = false;
+            cameraMuted = false;
+
+            micButton.textContent =
+                currentLanguage === "en"
+                    ? "🎤 Microphone"
+                    : "🎤 Микрофон";
+
+            cameraButton.textContent =
+                currentLanguage === "en"
+                    ? "📷 Camera"
+                    : "📷 Камера";
+
+            if (currentBanExpiresAt) {
+                setStatus("Доступ заблокирован");
+            } else {
+                setStatus("Готов к поиску");
+            }
+
+            updateButtons();
+            updateChatStatus();
+
+            /* Не держим STOP из-за медленного Render/backend. */
+            leavingLocally = false;
+
+            if (oldSocketId) {
+                fetch("/api/match/stop", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        socketId: oldSocketId
+                    }),
+                    keepalive: true
+                }).catch(function (error) {
+                    console.error("STOP SERVER ERROR:", error);
+                });
+            }
+
+            stopping = false;
+        }
+
+        /* =========================
+           MY GENDER
+           ========================= */
+
+        document
+            .querySelectorAll(
+                "[data-my-gender]"
+            )
+            .forEach(
+                function (button) {
+
+                    button.addEventListener(
+                        "click",
+                        function () {
+
+                            if (
+                                currentBanExpiresAt
+                            ) {
+                                return;
+                            }
+
+                            myGender =
+                                button
+                                    .getAttribute(
+                                        "data-my-gender"
+                                    );
+
+                            document
+                                .querySelectorAll(
+                                    "[data-my-gender]"
+                                )
+                                .forEach(
+                                    function (
+                                        item
+                                    ) {
+
+                                        item
+                                            .classList
+                                            .remove(
+                                                "selected"
+                                            );
+                                    }
+                                );
+
+                            button.classList.add(
+                                "selected"
+                            );
+
+                            setStatus(
+                                "Пол выбран"
+                            );
+                        }
+                    );
+                }
+            );
+
+        /* =========================
+           SEARCH GENDER
+           ========================= */
+
+        document
+            .querySelectorAll(
+                "[data-search-gender]"
+            )
+            .forEach(
+                function (button) {
+
+                    button.addEventListener(
+                        "click",
+                        function () {
+
+                            if (
+                                currentBanExpiresAt
+                            ) {
+                                return;
+                            }
+
+                            searchGender =
+                                button
+                                    .getAttribute(
+                                        "data-search-gender"
+                                    );
+
+                            document
+                                .querySelectorAll(
+                                    "[data-search-gender]"
+                                )
+                                .forEach(
+                                    function (
+                                        item
+                                    ) {
+
+                                        item
+                                            .classList
+                                            .remove(
+                                                "selected"
+                                            );
+                                    }
+                                );
+
+                            button.classList.add(
+                                "selected"
+                            );
+                        }
+                    );
+                }
+            );
+
+        /* =========================
+           MICROPHONE
+           ========================= */
+
+        micButton.addEventListener(
+            "click",
+            async function () {
+
+                if (
+                    !connected ||
+                    !localAudioTrack
+                ) {
+                    return;
+                }
+
+                if (micButton.disabled) {
+                    return;
+                }
+
+                micButton.disabled = true;
+
+                try {
+                    if (microphoneMuted) {
+                        await localAudioTrack.unmute();
+                        microphoneMuted = false;
+                    } else {
+                        await localAudioTrack.mute();
+                        microphoneMuted = true;
+                    }
+
+                    micButton.textContent =
+                        microphoneMuted
+                            ? (currentLanguage === "en"
+                                ? "🔇 Microphone"
+                                : "🔇 Микрофон")
+                            : (currentLanguage === "en"
+                                ? "🎤 Microphone"
+                                : "🎤 Микрофон");
+
+                } catch (error) {
+                    console.error("MIC ERROR:", error);
+                    microphoneMuted = false;
+
+                    try {
+                        await localAudioTrack.unmute();
+                    } catch (unmuteError) {}
+
+                    micButton.textContent =
+                        currentLanguage === "en"
+                            ? "🎤 Microphone"
+                            : "🎤 Микрофон";
+
+                    setStatus(
+                        currentLanguage === "en"
+                            ? "Microphone error"
+                            : "Ошибка микрофона"
+                    );
+                } finally {
+                    updateButtons();
+                }
+            }
+        );
+
+        /* =========================
+           CAMERA
+           ========================= */
+
+        cameraButton.addEventListener(
+            "click",
+            function () {
+
+                if (!localVideoTrack) {
+                    return;
+                }
+
+                try {
+
+                    if (
+                        cameraMuted
+                    ) {
+
+                        localVideoTrack.unmute();
+
+                        cameraMuted =
+                            false;
+
+                        cameraButton.textContent =
+                            "📷 Камера";
+
+                    } else {
+
+                        localVideoTrack.mute();
+
+                        cameraMuted =
+                            true;
+
+                        cameraButton.textContent =
+                            "🚫 Камера";
+                    }
+
+                } catch (error) {
+
+                    console.error(
+                        "CAMERA ERROR:",
+                        error
+                    );
+                }
+            }
+        );
+
+        /* =========================
+           CAMERA SWITCH
+           ========================= */
+
+        cameraSwitchButton.addEventListener(
+            "click",
+            function () {
+
+                switchCamera();
+            }
+        );
+
+        /* =========================
+           FIND
+           ========================= */
+
+        joinButton.addEventListener(
+            "click",
+            function () {
+
+                startSearch();
+            }
+        );
+
+        /* =========================
+           STOP
+           ========================= */
+
+        leaveButton.addEventListener(
+            "click",
+            function () {
+
+                if (
+                    leaveButton.disabled ||
+                    stopping
+                ) {
+                    return;
+                }
+
+                stopEverything();
+            }
+        );
+
+        /* =========================
+           TEXT CHAT TOGGLE
+           ========================= */
+
+        if (chatToggleButton) {
+            chatToggleButton.addEventListener(
+                "click",
+                function () {
+                    chatVisible = !chatVisible;
+
+                    var chatPanel =
+                        document.querySelector(".chat-panel");
+
+                    if (chatPanel) {
+                        chatPanel.classList.toggle(
+                            "chat-hidden",
+                            !chatVisible
+                        );
+                    }
+
+                    updateButtons();
+                }
+            );
+        }
+
+        /* =========================
+           CHAT SEND
+           ========================= */
+
+        chatForm.addEventListener(
+            "submit",
+            function (event) {
+
+                event.preventDefault();
+
+                if (!connected) {
+                    return;
+                }
+
+                var text =
+                    chatInput.value.trim();
+
+                if (!text) {
+                    return;
+                }
+
+                chatInput.value =
+                    "";
+
+                sendChatMessage(
+                    text
+                );
+            }
+        );
+
+        chatInput.addEventListener(
+            "keydown",
+            function (event) {
+
+                if (
+                    event.key ===
+                        "Enter" &&
+                    !event.shiftKey
+                ) {
+
+                    event.preventDefault();
+
+                    chatForm.requestSubmit();
+                }
+            }
+        );
+
+        /* =========================
+           ESCAPE
+           ========================= */
+
+        document.addEventListener(
+            "keydown",
+            function (event) {
+
+                if (
+                    event.key ===
+                    "Escape"
+                ) {
+
+                    if (
+                        !rulesModal
+                            .classList
+                            .contains(
+                                "hidden"
+                            )
+                    ) {
+
+                        return;
+
+                    } else if (
+                        !reportModal
+                            .classList
+                            .contains(
+                                "hidden"
+                            )
+                    ) {
+
+                        closeReportModal();
+
+                    } else if (
+                        !banModal
+                            .classList
+                            .contains(
+                                "hidden"
+                            )
+                    ) {
+
+                        banModal
+                            .classList
+                            .add(
+                                "hidden"
+                            );
+                    }
+                }
+            }
+        );
+
+        /* =========================
+           INIT
+           ========================= */
+
+        resetChatHistory();
+        resetReportUI();
+
+        var initialChatPanel =
+            document.querySelector(".chat-panel");
+        if (initialChatPanel) {
+            initialChatPanel.classList.remove("chat-hidden");
+        }
+        chatVisible = true;
+
+        updateButtons();
+        updateChatStatus();
+
+        clearChat();
+        resetTimer();
+
+        setStatus(
+            "Готов к поиску"
+        );
+
+        initRules();
+
+        console.log(
+            "ICECHAT READY"
+        );
+    }
+);
+</script>
+
+<script>
+(function () {
+    var languageButton = document.getElementById("languageButton");
+    if (!languageButton) return;
+
+    var currentLanguage = localStorage.getItem("icechat_language") || "ru";
+    var rulesContent = document.querySelector(".rules-content");
+    var rulesRuHTML = rulesContent ? rulesContent.innerHTML : "";
+
+    var translations = {
+        "Готов к поиску": "Ready to search",
+        "Поиск собеседника...": "Searching for a stranger...",
+        "Собеседник подключён": "Stranger connected",
+        "Собеседник отключился": "Stranger disconnected",
+        "Соединение завершено": "Connection ended",
+        "Доступ заблокирован": "Access blocked",
+        "Блокировка закончилась": "Ban ended",
+        "Не удалось отправить сообщение": "Failed to send message",
+        "Правила": "Rules",
+        "💎 Поддержать Ice Chat": "💎 Support Ice Chat",
+        "Ваш пол": "Your gender",
+        "Искать собеседника": "Search for",
+        "♂ Мужчина": '<span class="gender-symbol male">♂</span> Male',
+        "♀ Женщина": '<span class="gender-symbol female">♀</span> Female',
+        "Оба": "Both",
+        "Найдите собеседника": "Find a stranger",
+        "👤 Собеседник": "👤 Stranger",
+        "Собеседник": "Stranger",
+        "Вы": "You",
+        "💬 Чат": "💬 Chat",
+        "Нет соединения": "Not connected",
+        "Ожидание собеседника...": "Waiting for a stranger...",
+        "Здесь появятся сообщения": "Messages will appear here",
+        "Напишите сообщение...": "Write a message...",
+        "Отправить": "Send",
+        "🔎 Найти собеседника": "🔎 Find a stranger",
+        "🎤 Микрофон": "🎤 Microphone",
+        "🔇 Микрофон": "🔇 Microphone",
+        "💬 Текстовый чат": "💬 Text chat",
+        "💬 Скрыть чат": "💬 Hide chat",
+        "💬 Показать чат": "💬 Show chat",
+        "📷 Камера": "📷 Camera",
+        "🔄 Камера": "🔄 Camera",
+        "🚩 Пожаловаться": "🚩 Report",
+        "📋 Правила IceChat": "📋 IceChat Rules",
+        "Ознакомьтесь с правилами перед входом в видеочат. IceChat доступен только пользователям 18+.": "Please read the rules before entering the video chat. IceChat is available only to users aged 18+.",
+        "Я ознакомился с правилами и мне исполнилось 18 лет.": "I have read the rules and I am 18 or older.",
+        "Продолжить": "Continue",
+        "Понятно": "Got it",
+        "Выберите причину жалобы": "Choose a report reason",
+        "Оскорбления или токсичное поведение": "Insults or toxic behavior",
+        "Непристойный контент": "Sexual or inappropriate content",
+        "Спам или реклама": "Spam or advertising",
+        "Опасное или незаконное поведение": "Dangerous or illegal behavior",
+        "Другое": "Other",
+        "Дополнительная информация (необязательно)": "Additional information (optional)",
+        "Отмена": "Cancel",
+        "Отправить жалобу": "Submit report",
+        "Причина": "Reason",
+        "Срок": "Duration",
+        "Заблокирован до": "Blocked until",
+        "Навсегда": "Permanent",
+        "Нарушение правил": "Rule violation",
+        "Соединение не установлено": "Connection not established"
+    };
+
+    var reportMap = {
+        "Оскорбления или токсичное поведение": "Insults or toxic behavior",
+        "Непристойный контент": "Sexual or inappropriate content",
+        "Спам или реклама": "Spam or advertising",
+        "Опасное или незаконное поведение": "Dangerous or illegal behavior",
+        "Другое": "Other"
+    };
+
+    var ruReasons = Object.keys(reportMap);
+
+    var englishRules = `
+        <h3>Welcome to IceChat! 👋</h3>
+        <p><strong>IceChat</strong> is a random 1-on-1 video chat roulette that lets you talk to people from different countries and meet new strangers.</p>
+
+        <h3>🧊 Why IceChat?</h3>
+        <p>We want random communication to be simple and accessible. That's why <strong>gender selection in IceChat is completely free</strong>.</p>
+        <p>Unlike many other services where gender search may only be available for a fee, <strong>IceChat</strong> provides this feature for free, with no subscription or additional payments.</p>
+
+        <h3>📋 IceChat Rules</h3>
+        <p><strong>1. IceChat is intended only for users aged 18 and older.</strong> By using the service and pressing “Continue”, you confirm that you are 18 or older. Users under 18 are not allowed to use IceChat.</p>
+        <p><strong>2. Respect other users.</strong> Insults, bullying, threats, harassment, deliberate humiliation, and other aggressive behavior are prohibited.</p>
+        <p><strong>3. Explicit content is prohibited.</strong> Do not display or distribute sexual, pornographic, or otherwise clearly inappropriate content.</p>
+        <p><strong>4. Sexual behavior involving minors is prohibited.</strong> Any sexual acts, offers, or display of sexual content to minors are prohibited.</p>
+        <p><strong>5. Do not attempt to bypass age restrictions or provide deliberately false age information.</strong></p>
+        <p><strong>6. Do not record or distribute other users’ video without their consent.</strong> Recording must not be used for bullying, blackmail, harassment, or public distribution.</p>
+        <p><strong>7. Spam is prohibited.</strong> Mass messaging, intrusive advertising, repeated messages, link abuse, and other actions that interfere with normal communication are not allowed.</p>
+        <p><strong>8. Do not impersonate another person.</strong> Do not deliberately present yourself as another user, public figure, or organization representative in order to mislead others.</p>
+        <p><strong>9. Do not distribute personal data.</strong> Do not publish other people’s personal information or request passwords, home addresses, phone numbers, documents, bank card details, or other sensitive information.</p>
+        <p><strong>10. Extremism, hate propaganda, and glorification of criminal ideologies are prohibited.</strong> Calls for violence, terrorism propaganda, Nazism and other hateful ideologies, incitement to hatred or hostility, and support or glorification of such actions, organizations, or ideologies are not allowed.</p>
+        <p><strong>11. Dangerous and illegal behavior is prohibited.</strong> IceChat must not be used to threaten harm, involve others in dangerous activities, or commit or organize illegal activity.</p>
+        <p><strong>12. Do not disrupt the service.</strong> Hacking attempts, bypassing technical restrictions or bans, automated spam, server attacks, and other actions intended to disrupt IceChat are prohibited.</p>
+        <p><strong>13. Use reports appropriately.</strong> Do not submit knowingly false, mass, or abusive reports.</p>
+        <p><strong>14. A report does not automatically result in a ban.</strong> Each report is reviewed by moderation based on context, circumstances, and the nature of the violation. A warning or access restriction may be applied after review.</p>
+        <p><strong>15. Ban duration is determined by moderation.</strong> The duration of a restriction depends on the severity of the violation, its consequences, repetition, and other circumstances.</p>
+        <p><strong>16. A ban may be temporary or permanent.</strong> Depending on the situation, different access restriction periods may be applied, including permanent bans.</p>
+        <p><strong>17. Do not attempt to bypass a ban.</strong> Creating new accounts or using other methods to bypass restrictions may result in additional measures by the administration.</p>
+        <p><strong>18. The administration may restrict access for serious violations.</strong> In cases of serious rule violations, a user may be restricted or banned without prior warning.</p>
+        <p><strong>19. IceChat cannot control every stranger’s behavior in advance.</strong> Because the service uses random matching, you may encounter a user who violates the rules. In that case, end the conversation, press <strong>STOP</strong>, and use the report function.</p>
+        <p><strong>20. Users are responsible for their own actions.</strong> The IceChat administration does not approve or support violations committed by users of the service.</p>
+        <p><strong>21. The rules may change.</strong> The administration may update these rules, clarify individual provisions, and introduce additional restrictions to ensure the safety and normal operation of IceChat.</p>
+        <p><strong>22. Using the service for fraud is prohibited.</strong> Do not deceive users in order to obtain money, account access, verification codes, personal data, or other benefits.</p>
+        <p><strong>23. Do not impersonate IceChat administration.</strong> Do not claim to be an IceChat employee, moderator, or official representative without proper authorization.</p>
+        <p><strong>24. Constant service availability is not guaranteed.</strong> IceChat may be temporarily unavailable due to maintenance, updates, outages, or other circumstances.</p>
+        <p><strong>25. Users may end a conversation at any time.</strong> If a conversation makes you uncomfortable, end it with the <strong>STOP</strong> button or move to the next stranger.</p>
+        <p><strong>26. Do not use IceChat to aggressively collect contact information.</strong> Do not repeatedly or intrusively demand phone numbers, social media accounts, or other contact details from users.</p>
+        <p><strong>27. The administration may take measures to ensure service safety.</strong> When there are grounds to do so, the administration may restrict user access and take reasonable measures to prevent violations and keep IceChat safe.</p>
+
+        <p class="rules-gate-note">By pressing “Continue”, you confirm that you are 18 or older, have read the IceChat rules, and agree to follow them.</p>
+    `;
+
+    function tr(value) {
+        if (currentLanguage === "ru") return value;
+        return translations[value] || value;
+    }
+
+    function setText(selector, value) {
+        var el = document.querySelector(selector);
+        if (el) el.textContent = currentLanguage === "ru" ? value : tr(value);
+    }
+
+    function toRussian(value, fallback) {
+        if (!value) return fallback;
+        if (translations[value]) return value;
+        for (var key in translations) {
+            if (translations[key] === value) return key;
+        }
+        return fallback || value;
+    }
+
+    function setLanguage(lang) {
+        var statusDisplayed = document.getElementById("status")
+            ? document.getElementById("status").textContent.trim()
+            : "Готов к поиску";
+        var chatStatusDisplayed = document.getElementById("chatStatus")
+            ? document.getElementById("chatStatus").textContent.trim()
+            : "Нет соединения";
+        var previousStatus = toRussian(statusDisplayed, "Готов к поиску");
+        var previousChatStatus = toRussian(chatStatusDisplayed, "Нет соединения");
+
+        currentLanguage = lang === "en" ? "en" : "ru";
+        localStorage.setItem("icechat_language", currentLanguage);
+        document.documentElement.lang = currentLanguage;
+        document.title = currentLanguage === "en"
+            ? "IceChat — 1-on-1 Video Chat Roulette"
+            : "IceChat — видеочат-рулетка 1 на 1";
+
+        languageButton.textContent = currentLanguage === "ru" ? "EN" : "RU";
+        languageButton.setAttribute(
+            "aria-label",
+            currentLanguage === "ru" ? "Switch to English" : "Переключить на русский"
+        );
+
+        var statusEl = document.getElementById("status");
+        if (statusEl) statusEl.textContent = currentLanguage === "ru" ? previousStatus : (translations[previousStatus] || previousStatus);
+        setText(".donation-button", "💎 Поддержать Ice Chat");
+        setText("#rulesOpenButton", "Правила");
+        setText(".setup-block:nth-child(1) .setup-title", "Ваш пол");
+        setText(".setup-block:nth-child(2) .setup-title", "Искать собеседника");
+
+        var myGender = document.querySelectorAll("[data-my-gender]");
+        myGender.forEach(function (el) {
+            var value = el.getAttribute("data-my-gender");
+            el.innerHTML = value === "male"
+                ? '<span class="gender-symbol male">♂</span> ' + (currentLanguage === "ru" ? "Мужчина" : "Male")
+                : '<span class="gender-symbol female">♀</span> ' + (currentLanguage === "ru" ? "Женщина" : "Female");
+        });
+
+        var searchGender = document.querySelectorAll("[data-search-gender]");
+        searchGender.forEach(function (el) {
+            var value = el.getAttribute("data-search-gender");
+            if (value === "male") {
+                el.innerHTML = '<span class="gender-symbol male">♂</span> ' + (currentLanguage === "ru" ? "Мужчина" : "Male");
+            }
+            if (value === "female") {
+                el.innerHTML = '<span class="gender-symbol female">♀</span> ' + (currentLanguage === "ru" ? "Женщина" : "Female");
+            }
+            if (value === "any") el.textContent = currentLanguage === "ru" ? "Оба" : "Both";
+        });
+
+        setText("#remotePlaceholder > div > div:last-child", "Найдите собеседника");
+        setText(".video-card .video-label", "Собеседник");
+        setText(".video-card.small .video-label", "Вы");
+        setText(".chat-title", "💬 Чат");
+        var chatStatusEl = document.getElementById("chatStatus");
+        if (chatStatusEl) chatStatusEl.textContent = currentLanguage === "ru" ? previousChatStatus : (translations[previousChatStatus] || previousChatStatus);
+        setText("#chatEmpty", "Здесь появятся сообщения");
+        setText("#chatInput", "Напишите сообщение...");
+        var input = document.getElementById("chatInput");
+        if (input) input.placeholder = currentLanguage === "ru" ? "Напишите сообщение..." : "Write a message...";
+        setText("#chatSend", "Отправить");
+        setText("#joinButton", "🔎 Найти собеседника");
+        setText("#leaveButton", "⛔ STOP");
+
+        var micEl = document.getElementById("micButton");
+        if (micEl) {
+            micEl.textContent =
+                microphoneMuted
+                    ? (currentLanguage === "ru" ? "🔇 Микрофон" : "🔇 Microphone")
+                    : (currentLanguage === "ru" ? "🎤 Микрофон" : "🎤 Microphone");
+        }
+
+        setText("#cameraButton", "📷 Камера");
+        setText("#cameraSwitchButton", "🔄 Камера");
+        setText("#reportButton", "🚩 Пожаловаться");
+        if (reportSentThisConnection) {
+            setText("#reportButton", "✅ Жалоба отправлена");
+        }
+
+        var chatToggleEl =
+            document.getElementById("chatToggleButton");
+        if (chatToggleEl) {
+            chatToggleEl.textContent =
+                chatVisible
+                    ? (currentLanguage === "ru" ? "💬 Скрыть чат" : "💬 Hide chat")
+                    : (currentLanguage === "ru" ? "💬 Текстовый чат" : "💬 Text chat");
+        }
+
+        setText(".rules-title", "📋 Правила IceChat");
+        setText(".rules-subtitle", "Ознакомьтесь с правилами перед входом в видеочат. IceChat доступен только пользователям 18+.");
+        setText(".rules-check span", "Я ознакомился с правилами и мне исполнилось 18 лет.");
+        setText("#rulesContinue", "Продолжить");
+
+        setText(".ban-title", "Доступ заблокирован");
+        setText(".ban-subtitle", "Вы не можете пользоваться поиском собеседников до окончания блокировки.");
+        document.querySelectorAll(".ban-label").forEach(function (el) {
+            var ru = el.getAttribute("data-ru-label") || el.textContent.trim();
+            if (!el.getAttribute("data-ru-label")) el.setAttribute("data-ru-label", ru);
+            el.textContent = currentLanguage === "ru" ? ru : tr(ru);
+        });
+        setText("#banClose", "Понятно");
+
+        setText(".report-title", "🚩 Пожаловаться");
+        setText(".report-subtitle", "Выберите причину жалобы");
+        document.querySelectorAll(".report-reason").forEach(function (el) {
+            var ru = el.getAttribute("data-reason") || el.textContent.trim();
+            el.textContent = currentLanguage === "ru" ? ru : (reportMap[ru] || ru);
+        });
+        var details = document.getElementById("reportDetails");
+        if (details) details.placeholder = currentLanguage === "ru" ? "Дополнительная информация (необязательно)" : "Additional information (optional)";
+        setText("#reportCancel", "Отмена");
+        setText("#reportSubmit", "Отправить жалобу");
+
+        var remoteGender = document.getElementById("remoteGender");
+        if (remoteGender) {
+            var rg = remoteGender.textContent.trim();
+            if (rg === "♂ Мужчина" || rg === "♂ Male") remoteGender.textContent = "♂ " + (currentLanguage === "ru" ? "Мужчина" : "Male");
+            else if (rg === "♀ Женщина" || rg === "♀ Female") remoteGender.textContent = "♀ " + (currentLanguage === "ru" ? "Женщина" : "Female");
+            else remoteGender.textContent = currentLanguage === "ru" ? "👤 Собеседник" : "👤 Stranger";
+        }
+
+        if (rulesContent) rulesContent.innerHTML = currentLanguage === "ru" ? rulesRuHTML : englishRules;
+    }
+
+    function translateDynamic(el) {
+        if (!el || currentLanguage !== "en") return;
+        var value = el.textContent.trim();
+        if (translations[value]) el.textContent = translations[value];
+        if (value === "♂ Мужчина") el.textContent = "♂ Male";
+        if (value === "♀ Женщина") el.textContent = "♀ Female";
+        if (value === "👤 Собеседник") el.textContent = "👤 Stranger";
+        if (value === "Навсегда") el.textContent = "Permanent";
+        if (/^\\d+ д\\. /.test(value)) el.textContent = value.replace(/ д\\. /, " d. ").replace(/ ч\\./, " h.");
+        else if (/^\\d+ ч\\. /.test(value)) el.textContent = value.replace(/ ч\\. /, " h. ").replace(/ мин\\./, " min.");
+        else if (/^\\d+ мин\\. /.test(value)) el.textContent = value.replace(/ мин\\. /, " min. ").replace(/ сек\\./, " sec.");
+        else if (/^\\d+ сек\\.$/.test(value)) el.textContent = value.replace(" сек.", " sec.");
+    }
+
+    var observedSelectors = [
+        "#status", "#chatStatus", "#joinButton", "#leaveButton", "#micButton",
+        "#cameraButton", "#cameraSwitchButton", "#reportButton", "#chatToggleButton", "#reportSubmit",
+        "#remoteGender", "#banReason", "#banDuration", "#banUntil"
+    ];
+
+    var observer = new MutationObserver(function () {
+        if (currentLanguage !== "en") return;
+        observedSelectors.forEach(function (selector) {
+            var el = document.querySelector(selector);
+            if (el) translateDynamic(el);
+        });
+    });
+
+    observedSelectors.forEach(function (selector) {
+        var el = document.querySelector(selector);
+        if (el) observer.observe(el, { childList: true, characterData: true, subtree: true });
+    });
+
+    languageButton.addEventListener("click", function () {
+        setLanguage(currentLanguage === "ru" ? "en" : "ru");
+    });
+
+    setLanguage(currentLanguage);
+})();
+</script>
+
+</body>
+</html>
